@@ -4,31 +4,44 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>第二大脑 · Second Brain</title>
-  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%238b5cf6'/><stop offset='60%' stop-color='%23ec4899'/><stop offset='100%' stop-color='%23f59e0b'/></linearGradient></defs><rect width='100' height='100' rx='22' fill='url(%23g)'/><text x='50' y='66' font-family='sans-serif' font-size='52' font-weight='700' text-anchor='middle' fill='white'>B</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23ea580c'/><stop offset='33%25' stop-color='%230284c7'/><stop offset='66%25' stop-color='%237c3aed'/><stop offset='100%25' stop-color='%23059669'/></linearGradient></defs><rect width='100' height='100' rx='22' fill='url(%23g)'/><circle cx='38' cy='38' r='14' fill='white' opacity='0.92'/><circle cx='62' cy='38' r='14' fill='white' opacity='0.92'/><circle cx='38' cy='62' r='14' fill='white' opacity='0.92'/><circle cx='62' cy='62' r='14' fill='white' opacity='0.92'/></svg>" />
+
+  <!-- Webfonts with system fallbacks -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <div class="app">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <div class="brand-mark">B</div>
-        <div>第二大脑</div>
+        <div class="brand-mark"></div>
+        <div class="brand-text">第二大脑</div>
       </div>
       <div id="nav-list"></div>
-      <div style="margin-top: auto; padding: 12px 8px; font-size: 12px; color: var(--text-faint);">
-        <span id="vault-name">未配置</span>
+      <div class="sidebar-footer">
+        <div class="sidebar-footer-row">
+          <span class="vault-dot"></span>
+          <span id="vault-name">未配置</span>
+        </div>
       </div>
     </aside>
 
     <header class="topbar">
       <h1 id="page-title">仪表盘</h1>
+      <div class="search">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="search-input" class="search-input" placeholder="搜索人物 / 任务 / 项目 / 链接…" autocomplete="off" />
+        <span class="search-kbd">⌘K</span>
+        <div id="search-results" class="search-results hidden"></div>
+      </div>
       <div class="topbar-actions">
-        <div class="search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-          <input id="search-input" placeholder="搜索人物 / 任务 / 项目 / 链接…" autocomplete="off" />
-          <div id="search-results" class="search-results hidden"></div>
-        </div>
-        <button class="btn btn-ghost btn-sm" id="theme-toggle" title="切换主题">
+        <button class="btn btn-ghost btn-icon" id="cmdk-btn" title="命令面板 (⌘K)" aria-label="命令面板">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 9h6m-6 4h6m-6 4h4M5 7h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/></svg>
+        </button>
+        <button class="btn btn-ghost btn-icon" id="theme-toggle" title="切换主题" aria-label="切换主题">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         </button>
       </div>
@@ -39,6 +52,7 @@
 
   <div id="modal-root"></div>
   <div class="toast-stack" id="toast-root"></div>
+  <div id="cmdk-root"></div>
 
   <script src="/lib/marked.min.js"></script>
   <script src="/app.js"></script>
