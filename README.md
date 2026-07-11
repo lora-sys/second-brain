@@ -56,25 +56,25 @@
 <details>
 <summary><b>项目 + Wikilink</b> — <code>[[人物/张三]]</code> 双向引用，点击跳转</summary>
 <br>
-<img src="docs/screenshots/05-project-wikilink.png" alt="Project wikilink" width="900">
+<img src="docs/screenshots/05-project.png" alt="Project wikilink" width="900">
 </details>
 
 <details>
 <summary><b>链接详情</b> — link card 预览 + 抓取的正文</summary>
 <br>
-<img src="docs/screenshots/06-link-detail.png" alt="Link detail" width="900">
+<img src="docs/screenshots/06-link.png" alt="Link detail" width="900">
 </details>
 
 <details>
 <summary><b>暗色模式</b> — 右上角一键切换</summary>
 <br>
-<img src="docs/screenshots/07-dark-mode.png" alt="Dark mode" width="900">
+<img src="docs/screenshots/08-dark.png" alt="Dark mode" width="900">
 </details>
 
 <details>
 <summary><b>移动端</b> — 390px 视口自适应</summary>
 <br>
-<img src="docs/screenshots/08-mobile.png" alt="Mobile" width="400">
+<img src="docs/screenshots/10-mobile.png" alt="Mobile" width="400">
 </details>
 
 ## 🚀 快速开始

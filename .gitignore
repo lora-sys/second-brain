@@ -1,4 +1,4 @@
-# Dependencies
+# Dependencies - run npm install after cloning
 node_modules/
 
 # Runtime data
@@ -19,9 +19,7 @@ recordings/*.webm
 *~
 
 # Local config overrides - each user sets their own vaultPath via Settings
-config.local.json
-.env
-.env.local
-
-# Local user config (each user gets this generated on first run)
 config.json
+
+# Local test content (not part of the project)
+content/

@@ -1,18 +1,28 @@
-/* Second Brain Dashboard — vanilla JS single-page app */
+/* Second Brain Dashboard — v0.2
+ *
+ * Single-file SPA. No build, no framework.
+ * Modules: state, api, helpers, toast, modal, markdown, router, render pages, cmdk, theme.
+ */
 
 (() => {
   'use strict';
 
-  // ====== State ======
+  // ============================ State =================================
   const state = {
     config: null,
     counts: { person: 0, task: 0, project: 0, link: 0 },
     entities: { person: [], task: [], project: [], link: [] },
-    current: null, // current entity being viewed
+    tasksByStatus: null,
+    dueTasks: null,
+    recent: null,
+    tags: null,
+    current: null,
     theme: localStorage.getItem('sb-theme') || 'light',
+    searchResults: [],
+    searchActiveIndex: -1,
   };
 
-  // ====== API ======
+  // ============================ API ===================================
   const api = {
     async req(path, opts = {}) {
       const res = await fetch(path, {
@@ -21,9 +31,7 @@
       });
       const text = await res.text();
       const data = text ? JSON.parse(text) : null;
-      if (!res.ok) {
-        throw new Error(data?.error || `HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
       return data;
     },
     get(path) { return this.req(path); },
@@ -34,7 +42,7 @@
       get: () => api.get('/api/config'),
       put: (body) => api.put('/api/config', body),
     },
-    list: (type) => api.get(type ? `/api/entities?type=${type}` : "/api/entities").then(d => d.items),
+    list: (type) => api.get(type ? `/api/entities?type=${type}` : '/api/entities').then(d => d.items),
     read: (id) => api.get(`/api/entities/${encodeURIComponent(id)}`),
     create: (body) => api.post('/api/entities', body),
     update: (id, body) => api.put(`/api/entities/${encodeURIComponent(id)}`, body),
@@ -42,10 +50,9 @@
     search: (q) => api.get(`/api/search?q=${encodeURIComponent(q)}`),
     dashboard: () => api.get('/api/dashboard'),
     importLink: (body) => api.post('/api/links/import', body),
-    lightFetch: (url) => api.post('/api/links/light', { url }),
   };
 
-  // ====== Helpers ======
+  // ============================ Helpers ===============================
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -54,10 +61,7 @@
     try {
       const d = new Date(s);
       if (Number.isNaN(d.getTime())) return s;
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     } catch { return s; }
   };
   const fmtDateTime = (s) => {
@@ -71,33 +75,71 @@
   const initials = (s) => {
     const str = String(s || '').trim();
     if (!str) return '?';
-    const ch = [...str][0];
-    return ch.toUpperCase();
+    return [...str][0].toUpperCase();
   };
   const debounce = (fn, ms) => {
     let t;
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
   };
 
-  // ====== Toasts ======
+  // Hash a string to a stable 32-bit int, then use it to pick a color from a list.
+  function hashStr(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i += 1) {
+      h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    }
+    return h >>> 0;
+  }
+  const AVATAR_GRADIENTS = [
+    ['#fb923c', '#ea580c'], // orange
+    ['#38bdf8', '#0284c7'], // sky
+    ['#a78bfa', '#7c3aed'], // violet
+    ['#34d399', '#059669'], // emerald
+    ['#f472b6', '#db2777'], // pink
+    ['#fbbf24', '#d97706'], // amber
+    ['#f87171', '#dc2626'], // red
+    ['#60a5fa', '#2563eb'], // blue
+    ['#22d3ee', '#0891b2'], // cyan
+    ['#c084fc', '#9333ea'], // purple
+    ['#facc15', '#ca8a04'], // yellow
+    ['#fb7185', '#e11d48'], // rose
+  ];
+  function avatarColors(seed) {
+    const h = hashStr(seed || '');
+    const [a, b] = AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length];
+    return {
+      '--avatar-bg': a,
+      '--avatar-bg2': b,
+    };
+  }
+
+  // ============================ Toast =================================
   function toast(message, type = 'info') {
     const root = $('#toast-root');
     const el = document.createElement('div');
     el.className = `toast ${type}`;
     el.textContent = message;
     root.appendChild(el);
-    setTimeout(() => el.remove(), 4500);
+    setTimeout(() => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(20px)';
+      el.style.transition = 'all 200ms';
+      setTimeout(() => el.remove(), 220);
+    }, 4000);
   }
 
-  // ====== Modals ======
-  function openModal({ title, body, footer, large }) {
+  // ============================ Modal =================================
+  function openModal({ title, type, body, footer, large, prefixTitle }) {
     const root = $('#modal-root');
     root.innerHTML = `
       <div class="modal-backdrop" data-close>
-        <div class="modal ${large ? 'modal-large' : ''}">
+        <div class="modal ${large ? 'modal-large' : ''}" data-type="${type || ''}">
           <div class="modal-header">
-            <h3>${escapeHtml(title)}</h3>
-            <button class="modal-close" data-close>
+            <div>
+              ${prefixTitle ? `<div class="modal-title-prefix">${escapeHtml(prefixTitle)}</div>` : ''}
+              <h3 class="modal-title">${escapeHtml(title)}</h3>
+            </div>
+            <button class="modal-close" data-close aria-label="关闭">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </button>
           </div>
@@ -117,18 +159,22 @@
     }
     root.querySelectorAll('[data-close]').forEach((el) => {
       el.addEventListener('click', (e) => {
-        if (e.target.closest('.modal') && !e.target.matches('[data-close]')) return;
+        if (e.target.closest('.modal') && !e.target.matches('[data-close]') && !e.target.closest('[data-close]')) return;
         closeModal();
       });
     });
+    // Esc to close
+    setTimeout(() => {
+      const handler = (e) => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', handler); } };
+      document.addEventListener('keydown', handler);
+    }, 50);
   }
   function closeModal() { $('#modal-root').innerHTML = ''; }
 
-  // ====== Markdown rendering with wikilinks ======
+  // ============================ Markdown ==============================
   function setupMarked() {
     if (!window.marked) return;
     const renderer = new window.marked.Renderer();
-    // marked v14+: link({href, title, tokens}); image({href, title, text})
     renderer.link = function({ href, title, tokens }) {
       const h = String(href || '');
       if (h.startsWith('wikilink:')) {
@@ -153,7 +199,6 @@
   function renderMarkdown(body, opts = {}) {
     if (!body) return '<p class="muted">(无内容)</p>';
     setupMarked();
-    // Pre-process wikilinks [[target|label]] or [[target]]
     const pre = body.replace(/\[\[([^\]|]+?)(?:\|([^\]]+))?\]\]/g, (m, target, label) => {
       const text = label || target.split('/').pop();
       return `[${text}](wikilink:${encodeURIComponent(target)})`;
@@ -165,16 +210,13 @@
       console.error('[renderMarkdown] failed:', e.message);
       html = `<pre>${escapeHtml(body)}</pre>`;
     }
-    // Wrap embeds - very simple: turn image/video URLs into proper embed blocks.
     html = upgradeEmbeds(html, opts);
     return html;
   }
 
-  function upgradeEmbeds(html, opts = {}) {
-    // Promote bare image links to embeds (already inline via <img>).
-    // Promote YouTube/Bilibili/Vimeo links to video embeds.
+  function upgradeEmbeds(html) {
     html = html.replace(/<a href="(https?:\/\/[^"]+)"[^>]*>([^<]+)<\/a>/g, (m, href, text) => {
-      if (text.trim() !== href.trim()) return m; // keep as link if text differs
+      if (text.trim() !== href.trim()) return m;
       if (/(?:youtube\.com\/watch\?v=|youtu\.be\/|bilibili\.com\/video\/|vimeo\.com\/\d+)/i.test(href)) {
         return videoEmbedHtml(href);
       }
@@ -218,7 +260,7 @@
     </a>`;
   }
 
-  // ====== Routing ======
+  // ============================ Routing ================================
   const routes = {
     '': renderDashboard,
     '#/': renderDashboard,
@@ -233,8 +275,7 @@
   function parseHash() {
     const h = location.hash || '#/';
     if (h.startsWith('#/entity/')) {
-      const id = decodeURIComponent(h.slice('#/entity/'.length));
-      return { name: 'entity', params: { id } };
+      return { name: 'entity', params: { id: decodeURIComponent(h.slice('#/entity/'.length)) } };
     }
     return { name: h.replace(/^#\//, '') || 'dashboard', params: {} };
   }
@@ -242,13 +283,11 @@
   async function handleRoute() {
     const r = parseHash();
     const main = $('#main');
-    main.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+    main.innerHTML = `<div class="empty"><div class="spinner"></div></div>`;
     try {
-      // Refresh counts for sidebar.
       await refreshCounts();
-      if (r.name === 'entity') {
-        await renderEntity(r.params.id);
-      } else {
+      if (r.name === 'entity') await renderEntity(r.params.id);
+      else {
         const fn = routes['#/' + r.name] || routes[''];
         await fn();
       }
@@ -260,11 +299,11 @@
 
   window.addEventListener('hashchange', handleRoute);
 
-  // ====== Sidebar ======
+  // ============================ Sidebar ===============================
   function renderSidebar() {
     const nav = $('#nav-list');
     const items = [
-      { hash: '#/dashboard', label: '仪表盘', icon: 'home' },
+      { hash: '#/dashboard', label: '仪表盘', icon: 'home', count: null },
       { hash: '#/people', label: '人物', icon: 'user', count: state.counts.person },
       { hash: '#/tasks', label: '任务', icon: 'check', count: state.counts.task },
       { hash: '#/projects', label: '项目', icon: 'folder', count: state.counts.project },
@@ -286,20 +325,19 @@
       </div>
     `;
     nav.querySelectorAll('.nav-link').forEach((el) => {
-      el.addEventListener('click', () => {
-        location.hash = el.dataset.hash;
-      });
+      el.addEventListener('click', () => { location.hash = el.dataset.hash; });
     });
     if (state.config?.vaultPath) {
       const v = state.config.vaultPath.split('/').filter(Boolean).pop() || state.config.vaultPath;
-      $('#vault-name').textContent = `📁 ${v}`;
+      $('#vault-name').textContent = v;
     }
   }
 
   function updateSidebarActive() {
     const hash = location.hash || '#/';
     $$('.nav-link').forEach((el) => {
-      el.classList.toggle('active', el.dataset.hash === hash || (hash.startsWith('#/entity/') && el.dataset.hash.startsWith('#/')));
+      const isActive = el.dataset.hash === hash;
+      el.classList.toggle('active', isActive);
     });
   }
 
@@ -321,7 +359,7 @@
     }
   }
 
-  // ====== Icons ======
+  // ============================ Icons =================================
   const ICONS = {
     home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
     user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
@@ -332,106 +370,215 @@
     plus: '<path d="M12 5v14M5 12h14"/>',
     trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6 17.5 20a2 2 0 0 1-2 2H8.5a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>',
     edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
-    download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
-    external: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
-    tag: '<path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
     calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
     moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
     inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
-    search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+    cmd: '<path d="M9 6V3a3 3 0 1 1 6 0v3h3a3 3 0 1 1 0 6h-3v3a3 3 0 1 1-6 0v-3H6a3 3 0 1 1 0-6h3z"/>',
+    tag: '<path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+    palette: '<circle cx="13.5" cy="6.5" r="0.5"/><circle cx="17.5" cy="10.5" r="0.5"/><circle cx="8.5" cy="7.5" r="0.5"/><circle cx="6.5" cy="12.5" r="0.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>',
+    arrowRight: '<path d="M5 12h14M12 5l7 7-7 7"/>',
   };
   function iconSvg(name, size = 16) {
     const path = ICONS[name] || '';
     return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
   }
 
-  // ====== Page: Dashboard ======
+  function avatar(name, size) {
+    const sizeCls = size === 'lg' ? 'avatar-lg' : '';
+    const colors = avatarColors(name);
+    const style = Object.entries(colors).map(([k, v]) => `${k}:${v}`).join(';');
+    return `<div class="avatar ${sizeCls}" style="${style}">${escapeHtml(initials(name))}</div>`;
+  }
+
+  // ============================ Page: Dashboard ========================
   async function renderDashboard() {
     $('#page-title').textContent = '仪表盘';
-    const dash = state; // we just refreshed
     const main = $('#main');
     main.innerHTML = `
-      <div class="page-header">
-        <div>
-          <h2>你好 👋</h2>
-          <div class="subtitle">这是你的第二大脑，所有内容都同步到 Obsidian 仓库。</div>
-        </div>
-        <div class="actions">
+      <div class="dash-hero">
+        <h2>你好 👋</h2>
+        <div class="dash-subtitle">这是你的第二大脑，所有内容都同步到 Obsidian 仓库。</div>
+        <div class="dash-hero-actions">
           <button class="btn btn-primary" data-action="quick-add">${iconSvg('plus')} 新建</button>
+          <button class="btn" data-action="open-import">${iconSvg('link')} 导入链接</button>
         </div>
       </div>
 
-      <div class="dash-grid">
-        <div class="stat-card">
-          <div class="stat-label">人物</div>
+      <div class="stat-grid">
+        <div class="stat-card" data-type="person" data-hash="#/people">
+          <div class="stat-label"><span class="stat-dot"></span>人物</div>
           <div class="stat-value">${state.counts.person || 0}</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">任务</div>
+        <div class="stat-card" data-type="task" data-hash="#/tasks">
+          <div class="stat-label"><span class="stat-dot"></span>任务</div>
           <div class="stat-value">${state.counts.task || 0}</div>
-          <div class="text-faint" style="font-size: 12px; margin-top: 4px;">
-            待办 ${state.tasksByStatus?.todo || 0} · 进行 ${state.tasksByStatus?.in_progress || 0} · 完成 ${state.tasksByStatus?.done || 0}
-          </div>
+          <div class="stat-meta">待办 ${state.tasksByStatus?.todo || 0} · 进行 ${state.tasksByStatus?.in_progress || 0} · 完成 ${state.tasksByStatus?.done || 0}</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">项目</div>
+        <div class="stat-card" data-type="project" data-hash="#/projects">
+          <div class="stat-label"><span class="stat-dot"></span>项目</div>
           <div class="stat-value">${state.counts.project || 0}</div>
         </div>
-        <div class="stat-card">
-          <div class="stat-label">链接</div>
+        <div class="stat-card" data-type="link" data-hash="#/links">
+          <div class="stat-label"><span class="stat-dot"></span>链接</div>
           <div class="stat-value">${state.counts.link || 0}</div>
         </div>
       </div>
 
-      <div class="dash-section">
-        <h3>即将到期</h3>
-        ${state.dueTasks?.length ? renderTaskListRows(state.dueTasks) : '<div class="muted">没有即将到期的任务</div>'}
-      </div>
+      <div class="dash-grid">
+        <div>
+          <div class="dash-section">
+            <div class="dash-section-header">
+              <h3 class="dash-section-title">即将到期</h3>
+              <a class="dash-section-link" href="#/tasks">查看全部 →</a>
+            </div>
+            ${state.dueTasks?.length ? renderTaskListRows(state.dueTasks.slice(0, 5)) : emptyStateHTML('inbox', '没有即将到期的任务')}
+          </div>
 
-      <div class="dash-section">
-        <h3>最近编辑</h3>
-        ${state.recent?.length ? renderRecentList(state.recent) : '<div class="muted">还没有任何记录</div>'}
-      </div>
+          <div class="dash-section">
+            <div class="dash-section-header">
+              <h3 class="dash-section-title">最近编辑</h3>
+            </div>
+            ${state.recent?.length ? renderRecentGrid(state.recent.slice(0, 6)) : emptyStateHTML('folder', '还没有任何记录')}
+          </div>
+        </div>
 
-      <div class="dash-section">
-        <h3>常用标签</h3>
-        ${renderTagCloud(state.tags)}
+        <div>
+          <div class="widget">
+            <h3 class="widget-title">${iconSvg('tag', 14)} 标签</h3>
+            ${renderTagCloudGrouped(state.tags)}
+          </div>
+          <div class="widget">
+            <h3 class="widget-title">${iconSvg('check', 14)} 任务进度</h3>
+            ${renderTaskProgress()}
+          </div>
+        </div>
       </div>
     `;
 
     main.querySelector('[data-action="quick-add"]').addEventListener('click', openQuickAdd);
+    main.querySelector('[data-action="open-import"]').addEventListener('click', openImportLinkModal);
+    main.querySelectorAll('.stat-card').forEach((el) => {
+      el.addEventListener('click', () => { location.hash = el.dataset.hash; });
+    });
     attachRowHandlers(main);
   }
 
   function renderTaskListRows(tasks) {
-    return `<div class="grid">${tasks.map((t) => `
-      <div class="card" data-entity-id="${escapeHtml(t.id)}">
+    return `<div class="grid" style="grid-template-columns: 1fr 1fr;">${tasks.map((t) => `
+      <div class="card" data-entity-id="${escapeHtml(t.id)}" data-type="task">
         <div class="card-title">${escapeHtml(t.data.title || t.slug)}</div>
         <div class="card-meta">
           <span class="status status-${escapeHtml(t.data.status || 'todo')}">${statusLabel(t.data.status)}</span>
           <span class="priority-${escapeHtml(t.data.priority || 'medium')}">${priorityLabel(t.data.priority)}</span>
-          ${t.data.due ? `<span>${iconSvg('calendar', 12)} ${escapeHtml(t.data.due)}</span>` : ''}
+          ${t.data.due ? `<span>${iconSvg('calendar', 11)} ${escapeHtml(t.data.due)}</span>` : ''}
         </div>
       </div>`).join('')}</div>`;
   }
 
-  function renderRecentList(items) {
-    return `<div class="grid">${items.slice(0, 8).map((e) => `
-      <div class="card" data-entity-id="${escapeHtml(e.id)}">
-        <div class="card-meta"><span>${typeLabel(e.type)}</span><span>${fmtDateTime(e.data.updated)}</span></div>
-        <div class="card-title">${escapeHtml(e.data.title || e.data.name || e.slug)}</div>
-        ${e.data.description ? `<div class="card-body">${escapeHtml(e.data.description)}</div>` : ''}
-      </div>`).join('')}</div>`;
+  function renderRecentGrid(items) {
+    return `<div class="grid">${items.map((e) => recentCardHtml(e)).join('')}</div>`;
   }
 
-  function renderTagCloud(tags) {
-    const entries = Object.entries(tags || {}).sort((a, b) => b[1] - a[1]).slice(0, 24);
+  function recentCardHtml(e) {
+    const title = e.data.title || e.data.name || e.slug;
+    if (e.type === 'person') {
+      return `<div class="card" data-entity-id="${escapeHtml(e.id)}" data-type="person">
+        <div class="person-card-row">
+          ${avatar(title)}
+          <div class="card-title-stack">
+            <div class="card-title">${escapeHtml(title)}</div>
+            <div class="card-meta">
+              ${e.data.status ? `<span class="status status-${escapeHtml(e.data.status)}">${statusLabel(e.data.status)}</span>` : ''}
+              ${e.data.company ? `<span>${escapeHtml(e.data.company)}</span>` : ''}
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
+    if (e.type === 'link' && e.data.cover) {
+      return `<div class="card" data-entity-id="${escapeHtml(e.id)}" data-type="link">
+        <img class="card-cover" src="${escapeHtml(e.data.cover)}" alt="" loading="lazy" onerror="this.style.display='none'" />
+        <div class="card-meta"><span>${escapeHtml(e.data.site || '')}</span></div>
+        <div class="card-title">${escapeHtml(title)}</div>
+      </div>`;
+    }
+    return `<div class="card" data-entity-id="${escapeHtml(e.id)}" data-type="${e.type}">
+      <div class="card-meta"><span>${typeLabel(e.type)}</span><span>${fmtDate(e.data.updated)}</span></div>
+      <div class="card-title">${escapeHtml(title)}</div>
+      ${e.data.description ? `<div class="card-body">${escapeHtml(e.data.description)}</div>` : ''}
+    </div>`;
+  }
+
+  function renderTagCloudGrouped(tags) {
+    const entries = Object.entries(tags || {});
     if (!entries.length) return '<div class="muted">还没有标签</div>';
-    return `<div class="tag-row">${entries.map(([t, n]) => `<span class="tag">#${escapeHtml(t)} <span class="text-faint">${n}</span></span>`).join('')}</div>`;
+    // Group by type via inspecting recent items... too expensive; just show flat for now
+    const sorted = entries.sort((a, b) => b[1] - a[1]).slice(0, 24);
+    return `<div class="tag-cloud">${sorted.map(([t, n]) => `<span class="tag">#${escapeHtml(t)} <span class="text-faint">${n}</span></span>`).join('')}</div>`;
   }
 
-  // ====== Page: People ======
+  function renderTaskProgress() {
+    const s = state.tasksByStatus || { todo: 0, in_progress: 0, done: 0, cancelled: 0 };
+    const total = (s.todo || 0) + (s.in_progress || 0) + (s.done || 0) + (s.cancelled || 0);
+    if (!total) return '<div class="muted">还没有任务</div>';
+    const segments = [
+      { key: 'done', label: '已完成', count: s.done || 0, color: 'var(--success)' },
+      { key: 'in_progress', label: '进行中', count: s.in_progress || 0, color: 'var(--type-task)' },
+      { key: 'todo', label: '待办', count: s.todo || 0, color: 'var(--text-faint)' },
+      { key: 'cancelled', label: '已取消', count: s.cancelled || 0, color: 'var(--surface-3)' },
+    ];
+    const pct = (n) => total ? (n / total) * 100 : 0;
+    return `
+      <div style="display:flex; height:8px; border-radius:999px; overflow:hidden; background:var(--surface-3); margin-bottom: 10px;">
+        ${segments.filter(s => s.count).map((s) => `<div style="width:${pct(s.count)}%; background:${s.color};" title="${s.label} ${s.count}"></div>`).join('')}
+      </div>
+      ${segments.map((s) => `
+        <div class="widget-row">
+          <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${s.color};"></span>
+          <span>${s.label}</span>
+          <span class="meta">${s.count}</span>
+        </div>`).join('')}
+    `;
+  }
+
+  // ============================ Empty states ==========================
+  function emptyStateSVG(kind) {
+    const map = {
+      user: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" class="empty-illustration">
+        <circle cx="48" cy="36" r="16" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" opacity="0.4"/>
+        <path d="M20 80c0-15 12-25 28-25s28 10 28 25" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" opacity="0.4"/>
+      </svg>`,
+      check: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" class="empty-illustration">
+        <rect x="20" y="20" width="56" height="56" rx="8" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4" opacity="0.4"/>
+        <path d="M32 48l12 12 20-24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`,
+      folder: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" class="empty-illustration">
+        <path d="M16 32l8-12h16l8 12h32v36H16z" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" opacity="0.4"/>
+        <circle cx="48" cy="56" r="6" fill="none" stroke="currentColor" stroke-width="2" opacity="0.4"/>
+      </svg>`,
+      link: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" class="empty-illustration">
+        <path d="M30 50c0-10 8-18 18-18s18 8 18 18" fill="none" stroke="currentColor" stroke-width="2" opacity="0.4"/>
+        <path d="M66 50c0 10-8 18-18 18s-18-8-18-18" fill="none" stroke="currentColor" stroke-width="2" opacity="0.4"/>
+        <circle cx="48" cy="50" r="6" fill="currentColor" opacity="0.4"/>
+      </svg>`,
+      inbox: `<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" class="empty-illustration">
+        <path d="M20 30h56l8 24v22H12V54z" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3" opacity="0.4"/>
+        <line x1="20" y1="54" x2="76" y2="54" stroke="currentColor" stroke-width="2" opacity="0.4"/>
+      </svg>`,
+    };
+    return map[kind] || '';
+  }
+
+  function emptyStateHTML(kind, title, body) {
+    return `<div class="empty">
+      ${emptyStateSVG(kind)}
+      ${title ? `<h3>${escapeHtml(title)}</h3>` : ''}
+      ${body ? `<p>${escapeHtml(body)}</p>` : ''}
+    </div>`;
+  }
+
+  // ============================ Page: People ==========================
   async function renderPeople() {
     $('#page-title').textContent = '人物';
     const main = $('#main');
@@ -439,7 +586,7 @@
       <div class="page-header">
         <div>
           <h2>人物</h2>
-          <div class="subtitle">记录我认识的人，以及他们与项目/任务的联系。</div>
+          <div class="subtitle">记录我认识的人，以及他们与项目 / 任务的联系。</div>
         </div>
         <div class="actions">
           <button class="btn btn-primary" data-action="new-person">${iconSvg('plus')} 新增人物</button>
@@ -451,7 +598,7 @@
     state.entities.person = items;
     const list = $('#people-list');
     if (!items.length) {
-      list.innerHTML = `<div class="empty"><h3>还没有人物</h3><p>点击右上角新增你的第一个人物卡片。</p></div>`;
+      list.innerHTML = emptyStateHTML('user', '还没有人物', '点击右上角新增你的第一个人物卡片。');
     } else {
       list.innerHTML = `<div class="grid">${items.map(personCardHtml).join('')}</div>`;
     }
@@ -461,14 +608,15 @@
 
   function personCardHtml(p) {
     const name = p.data.name || p.slug;
-    return `<div class="card" data-entity-id="${escapeHtml(p.id)}">
-      <div style="display:flex; gap:10px; align-items:center;">
-        <div class="detail-avatar" style="width:38px;height:38px;font-size:15px;border-radius:10px;">${escapeHtml(initials(name))}</div>
-        <div style="flex:1; min-width:0;">
+    return `<div class="card" data-entity-id="${escapeHtml(p.id)}" data-type="person">
+      <div class="person-card-row">
+        ${avatar(name)}
+        <div class="card-title-stack">
           <div class="card-title">${escapeHtml(name)}</div>
           <div class="card-meta">
             ${p.data.status ? `<span class="status status-${escapeHtml(p.data.status)}">${statusLabel(p.data.status)}</span>` : ''}
-            ${p.data.met ? `<span>${iconSvg('calendar', 12)} ${escapeHtml(p.data.met)}</span>` : ''}
+            ${p.data.company ? `<span>${escapeHtml(p.data.company)}</span>` : ''}
+            ${p.data.met ? `<span>${iconSvg('calendar', 11)} ${escapeHtml(p.data.met)}</span>` : ''}
           </div>
         </div>
       </div>
@@ -476,7 +624,7 @@
     </div>`;
   }
 
-  // ====== Page: Tasks (kanban) ======
+  // ============================ Page: Tasks ===========================
   async function renderTasks() {
     $('#page-title').textContent = '任务';
     const main = $('#main');
@@ -484,7 +632,7 @@
       <div class="page-header">
         <div>
           <h2>任务</h2>
-          <div class="subtitle">看板视图：待办 / 进行中 / 已完成 / 已取消</div>
+          <div class="subtitle">看板视图 — 拖拽切换状态，点击「+」直接在列里添加。</div>
         </div>
         <div class="actions">
           <button class="btn btn-primary" data-action="new-task">${iconSvg('plus')} 新建任务</button>
@@ -495,43 +643,134 @@
     const items = await api.list('task');
     state.entities.task = items;
     const columns = [
-      { id: 'todo', title: '待办', items: [] },
-      { id: 'in_progress', title: '进行中', items: [] },
-      { id: 'done', title: '已完成', items: [] },
-      { id: 'cancelled', title: '已取消', items: [] },
+      { id: 'todo', title: '待办' },
+      { id: 'in_progress', title: '进行中' },
+      { id: 'done', title: '已完成' },
+      { id: 'cancelled', title: '已取消' },
     ];
     for (const t of items) {
       const col = columns.find((c) => c.id === (t.data.status || 'todo')) || columns[0];
+      col.items = col.items || [];
       col.items.push(t);
     }
-    for (const col of columns) col.items.sort((a, b) => (a.data.due || 'z').localeCompare(b.data.due || 'z'));
+    for (const col of columns) {
+      col.items = (col.items || []).sort((a, b) => (a.data.due || 'z').localeCompare(b.data.due || 'z'));
+    }
 
     const kanban = $('#kanban');
     kanban.innerHTML = columns.map((col) => `
-      <div class="kanban-col" data-status="${col.id}">
-        <h3>${escapeHtml(col.title)} <span class="kanban-col-count">${col.items.length}</span></h3>
-        ${col.items.length === 0
+      <div class="kanban-col" data-status="${col.id}" data-drop-active="false">
+        <div class="kanban-col-header">
+          <div class="kanban-col-title">${col.title}</div>
+          <div class="kanban-col-count">${(col.items || []).length}</div>
+        </div>
+        ${(col.items || []).length === 0
           ? `<div class="kanban-empty">— 空白 —</div>`
-          : col.items.map(taskCardHtml).join('')}
+          : (col.items || []).map(taskCardHtml).join('')}
+        <button class="kanban-add" data-action="add-to-col" data-status="${col.id}">+ 添加任务</button>
       </div>
     `).join('');
+
     main.querySelector('[data-action="new-task"]').addEventListener('click', () => openEntityModal('task'));
+    main.querySelectorAll('[data-action="add-to-col"]').forEach((btn) => {
+      btn.addEventListener('click', () => openEntityModal('task', null, btn.dataset.status));
+    });
     attachRowHandlers(kanban);
+    initKanbanDnD(kanban);
   }
 
   function taskCardHtml(t) {
     const overdue = t.data.due && new Date(t.data.due) < new Date() && t.data.status !== 'done' && t.data.status !== 'cancelled';
-    return `<div class="kanban-card" data-entity-id="${escapeHtml(t.id)}">
+    return `<div class="kanban-card" data-entity-id="${escapeHtml(t.id)}" data-type="task" draggable="true">
       <div class="kanban-card-title">${escapeHtml(t.data.title || t.slug)}</div>
       <div class="kanban-card-meta">
         <span class="priority-${escapeHtml(t.data.priority || 'medium')}">${priorityLabel(t.data.priority)}</span>
         ${t.data.due ? `<span style="color:${overdue ? 'var(--danger)' : 'inherit'}">${iconSvg('calendar', 11)} ${escapeHtml(t.data.due)}</span>` : ''}
+        ${(t.data.tags || []).slice(0, 2).map((tg) => `<span class="tag">#${escapeHtml(tg)}</span>`).join('')}
       </div>
-      ${renderTagRow(t.data.tags)}
     </div>`;
   }
 
-  // ====== Page: Projects ======
+  // ============================ Kanban drag-and-drop ===================
+  function initKanbanDnD(root) {
+    let draggedId = null;
+    root.querySelectorAll('.kanban-card').forEach((card) => {
+      card.addEventListener('dragstart', (e) => {
+        draggedId = card.dataset.entityId;
+        card.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', draggedId); } catch {}
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('is-dragging');
+        draggedId = null;
+        root.querySelectorAll('.kanban-col').forEach((c) => c.dataset.dropActive = 'false');
+      });
+    });
+    root.querySelectorAll('.kanban-col').forEach((col) => {
+      col.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        col.dataset.dropActive = 'true';
+      });
+      col.addEventListener('dragleave', (e) => {
+        // Only clear if leaving the column itself, not children
+        if (e.target === col || !col.contains(e.relatedTarget)) {
+          col.dataset.dropActive = 'false';
+        }
+      });
+      col.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        col.dataset.dropActive = 'false';
+        const id = (e.dataTransfer.getData('text/plain')) || draggedId;
+        if (!id) return;
+        const newStatus = col.dataset.status;
+        // Optimistic update
+        const card = root.querySelector(`.kanban-card[data-entity-id="${id}"]`);
+        if (card) {
+          const src = card.parentElement;
+          src.removeChild(card);
+          // Insert above the add button
+          const addBtn = col.querySelector('.kanban-add');
+          col.insertBefore(card, addBtn);
+          // Update counts
+          updateColCount(src);
+          updateColCount(col);
+        }
+        try {
+          await api.update(id, { data: { status: newStatus } });
+          // Refresh state
+          const t = state.entities.task.find((x) => x.id === id);
+          if (t) {
+            t.data.status = newStatus;
+            t.data.updated = new Date().toISOString();
+          }
+          await refreshCounts();
+        } catch (err) {
+          toast('更新失败：' + err.message, 'error');
+          handleRoute(); // Re-render to recover state
+        }
+      });
+    });
+  }
+
+  function updateColCount(col) {
+    const countEl = col.querySelector('.kanban-col-count');
+    const cards = col.querySelectorAll('.kanban-card');
+    if (countEl) countEl.textContent = String(cards.length);
+    // Toggle empty state
+    const existingEmpty = col.querySelector('.kanban-empty');
+    if (cards.length === 0 && !existingEmpty) {
+      const empty = document.createElement('div');
+      empty.className = 'kanban-empty';
+      empty.textContent = '— 空白 —';
+      col.insertBefore(empty, col.querySelector('.kanban-add'));
+    } else if (cards.length > 0 && existingEmpty) {
+      existingEmpty.remove();
+    }
+  }
+
+  // ============================ Page: Projects ========================
   async function renderProjects() {
     $('#page-title').textContent = '项目';
     const main = $('#main');
@@ -539,7 +778,7 @@
       <div class="page-header">
         <div>
           <h2>项目</h2>
-          <div class="subtitle">主题、目标、相关人物/任务/链接都集中在这里。</div>
+          <div class="subtitle">主题、目标、相关人物 / 任务 / 链接都集中在这里。</div>
         </div>
         <div class="actions">
           <button class="btn btn-primary" data-action="new-project">${iconSvg('plus')} 新建项目</button>
@@ -551,7 +790,7 @@
     state.entities.project = items;
     const list = $('#projects-list');
     if (!items.length) {
-      list.innerHTML = `<div class="empty"><h3>还没有项目</h3><p>创建一个项目，把相关的任务、链接、人串起来。</p></div>`;
+      list.innerHTML = emptyStateHTML('folder', '还没有项目', '创建一个项目，把相关的任务、链接、人串起来。');
     } else {
       list.innerHTML = `<div class="grid">${items.map(projectCardHtml).join('')}</div>`;
     }
@@ -560,7 +799,7 @@
   }
 
   function projectCardHtml(p) {
-    return `<div class="card" data-entity-id="${escapeHtml(p.id)}">
+    return `<div class="card" data-entity-id="${escapeHtml(p.id)}" data-type="project">
       <div class="card-meta"><span>${typeLabel('project')}</span><span>${fmtDate(p.data.updated)}</span></div>
       <div class="card-title">${escapeHtml(p.data.title || p.slug)}</div>
       ${p.data.description ? `<div class="card-body">${escapeHtml(p.data.description)}</div>` : ''}
@@ -568,7 +807,7 @@
     </div>`;
   }
 
-  // ====== Page: Links ======
+  // ============================ Page: Links ===========================
   async function renderLinks() {
     $('#page-title').textContent = '链接';
     const main = $('#main');
@@ -576,7 +815,7 @@
       <div class="page-header">
         <div>
           <h2>链接</h2>
-          <div class="subtitle">从外部导入的文章/视频/资料，可以离线阅读。</div>
+          <div class="subtitle">从外部导入的文章 / 视频 / 资料，可以离线阅读。</div>
         </div>
         <div class="actions">
           <button class="btn btn-primary" data-action="import-link">${iconSvg('plus')} 导入链接</button>
@@ -588,7 +827,7 @@
     state.entities.link = items;
     const list = $('#links-list');
     if (!items.length) {
-      list.innerHTML = `<div class="empty"><h3>还没有链接</h3><p>粘贴一个 URL，抓取后会作为卡片保存。</p></div>`;
+      list.innerHTML = emptyStateHTML('link', '还没有链接', '粘贴一个 URL，抓取后会作为卡片保存。');
     } else {
       list.innerHTML = `<div class="grid">${items.map(linkCardItemHtml).join('')}</div>`;
     }
@@ -598,11 +837,12 @@
 
   function linkCardItemHtml(l) {
     const cover = l.data.cover ? `<img class="card-cover" src="${escapeHtml(l.data.cover)}" alt="" loading="lazy" onerror="this.style.display='none'" />` : '';
-    return `<div class="card" data-entity-id="${escapeHtml(l.id)}">
+    return `<div class="card" data-entity-id="${escapeHtml(l.id)}" data-type="link">
       ${cover}
       <div class="card-meta">
         ${l.data.site ? `<span>${escapeHtml(l.data.site)}</span>` : ''}
         <span>${l.data.fetchMode === 'deep' ? '深度抓取' : '轻量'}</span>
+        ${l.data.fetchStatus === 'failed' ? '<span style="color:var(--warning)">⚠ 抓取失败</span>' : ''}
       </div>
       <div class="card-title">${escapeHtml(l.data.title || l.slug)}</div>
       ${l.data.description ? `<div class="card-body">${escapeHtml(l.data.description)}</div>` : ''}
@@ -610,7 +850,7 @@
     </div>`;
   }
 
-  // ====== Page: Settings ======
+  // ============================ Page: Settings ========================
   async function renderSettings() {
     $('#page-title').textContent = '设置';
     const cfg = await api.config.get();
@@ -643,7 +883,16 @@
           <button class="btn btn-primary" data-action="save">保存</button>
         </div>
         <div class="hr"></div>
-        <h3 style="margin: 0 0 8px; font-size: 14px;">关于</h3>
+        <h3 style="margin: 0 0 8px; font-size: 14px;">主题</h3>
+        <div class="editor-row">
+          <label>外观</label>
+          <div style="display:flex; gap: 6px; flex-wrap: wrap;">
+            ${['light', 'dark', 'sepia'].map(t => `
+              <button class="btn btn-sm ${state.theme === t ? 'btn-primary' : ''}" data-action="set-theme" data-theme="${t}">${t === 'light' ? '浅色' : t === 'dark' ? '深色' : '复古'}</button>
+            `).join('')}
+          </div>
+        </div>
+        <div class="hr"></div>
         <p class="muted">
           所有内容都以 Markdown 文件形式存储在你的 Obsidian Vault 中。
           这是 source of truth —— 在 Obsidian 里直接修改文件，刷新页面即可看到更新。
@@ -666,12 +915,19 @@
       try {
         const next = await api.config.put(body);
         state.config = next;
-        toast('已保存。重启服务器后端口/地址生效。', 'success');
+        toast('已保存。重启服务器后端口 / 地址生效。', 'success');
       } catch (err) { toast(err.message, 'error'); }
+    });
+    main.querySelectorAll('[data-action="set-theme"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.theme = btn.dataset.theme;
+        applyTheme();
+        renderSettings();
+      });
     });
   }
 
-  // ====== Quick add ======
+  // ============================ Quick add =============================
   function openQuickAdd() {
     const html = `
       <div class="editor">
@@ -685,11 +941,7 @@
         </div>
         <div class="editor-row"><label>标题</label><input id="qa-title" placeholder="输入标题…" /></div>
       </div>`;
-    openModal({
-      title: '快速新建',
-      body: html,
-      footer: `<button class="btn" data-close>取消</button><button class="btn btn-primary" id="qa-submit">创建</button>`,
-    });
+    openModal({ title: '快速新建', type: 'task', body: html, footer: `<button class="btn" data-close>取消</button><button class="btn btn-primary" id="qa-submit">创建</button>` });
     $('#qa-submit').addEventListener('click', async () => {
       const type = $('#qa-type').value;
       const title = $('#qa-title').value.trim();
@@ -704,10 +956,11 @@
     setTimeout(() => $('#qa-title').focus(), 50);
   }
 
-  // ====== Entity modal (create/edit) ======
-  function openEntityModal(type, existing) {
+  // ============================ Entity modal =========================
+  function openEntityModal(type, existing, initialStatus) {
     const isEdit = !!existing;
     const d = existing?.data || {};
+    if (initialStatus) d.status = initialStatus;
     const fields = fieldsFor(type);
     const formHtml = `
       <div class="editor">
@@ -724,20 +977,23 @@
           ${isEdit ? `最后更新：${fmtDateTime(d.updated)}` : ''}
         </div>
       </div>`;
+    const typeLabelMap = { person: '人物', task: '任务', project: '项目', link: '链接' };
     openModal({
-      title: `${isEdit ? '编辑' : '新建'} ${typeLabel(type)}`,
+      title: `${isEdit ? '编辑' : '新建'} ${typeLabelMap[type]}`,
+      type,
+      prefixTitle: typeLabelMap[type].toUpperCase(),
       body: formHtml,
       footer: isEdit
-        ? `<button class="btn btn-danger" id="f-delete">删除</button>
+        ? `<button class="btn btn-danger" id="f-delete">${iconSvg('trash')} 删除</button>
            <button class="btn" data-close>取消</button>
-           <button class="btn btn-primary" id="f-save">保存</button>`
+           <button class="btn btn-primary" id="f-save">${iconSvg('check')} 保存</button>`
         : `<button class="btn" data-close>取消</button>
-           <button class="btn btn-primary" id="f-save">创建</button>`,
+           <button class="btn btn-primary" id="f-save">${iconSvg('check')} ${isEdit ? '保存' : '创建'}</button>`,
     });
 
     $('#f-save').addEventListener('click', async () => {
       const title = $('#f-title').value.trim();
-      if (!title) { toast('请填写标题/姓名', 'error'); return; }
+      if (!title) { toast('请填写标题 / 姓名', 'error'); return; }
       const data = { ...d };
       const body = $('#f-body').value;
       if (type === 'person') data.name = title;
@@ -753,18 +1009,12 @@
         }
       }
       try {
-        if (isEdit) {
-          await api.update(existing.id, { data, body });
-        } else {
-          await api.create({ type, title, data, body });
-        }
+        if (isEdit) await api.update(existing.id, { data, body });
+        else await api.create({ type, title, data, body });
         toast(isEdit ? '已保存' : '已创建', 'success');
         closeModal();
-        if (isEdit) {
-          location.hash = `#/entity/${encodeURIComponent(existing.id)}`;
-        } else {
-          handleRoute();
-        }
+        if (isEdit) location.hash = `#/entity/${encodeURIComponent(existing.id)}`;
+        else handleRoute();
       } catch (err) { toast(err.message, 'error'); }
     });
     if (isEdit) {
@@ -783,37 +1033,27 @@
   function fieldsFor(type) {
     if (type === 'person') return [
       { key: 'status', label: '状态', kind: 'select', options: [
-        { value: 'active', label: '活跃' },
-        { value: 'dormant', label: '久未联系' },
-        { value: 'archived', label: '已归档' },
+        { value: 'active', label: '活跃' }, { value: 'dormant', label: '久未联系' }, { value: 'archived', label: '已归档' },
       ] },
       { key: 'met', label: '认识于', kind: 'date' },
       { key: 'company', label: '公司 / 团队', kind: 'text' },
       { key: 'role', label: '角色 / 头衔', kind: 'text' },
       { key: 'contact', label: '联系方式', kind: 'object', fields: [
-        { key: 'email', label: '邮箱' },
-        { key: 'phone', label: '电话' },
-        { key: 'wechat', label: '微信' },
+        { key: 'email', label: '邮箱' }, { key: 'phone', label: '电话' }, { key: 'wechat', label: '微信' },
       ] },
       { key: 'social', label: '社交账号', kind: 'object', fields: [
-        { key: 'github', label: 'GitHub' },
-        { key: 'twitter', label: 'Twitter / X' },
-        { key: 'linkedin', label: 'LinkedIn' },
-        { key: 'website', label: '个人站' },
+        { key: 'github', label: 'GitHub' }, { key: 'twitter', label: 'Twitter / X' },
+        { key: 'linkedin', label: 'LinkedIn' }, { key: 'website', label: '个人站' },
       ] },
       { key: 'tags', label: '标签', kind: 'tags' },
     ];
     if (type === 'task') return [
       { key: 'status', label: '状态', kind: 'select', options: [
-        { value: 'todo', label: '待办' },
-        { value: 'in_progress', label: '进行中' },
-        { value: 'done', label: '已完成' },
-        { value: 'cancelled', label: '已取消' },
+        { value: 'todo', label: '待办' }, { value: 'in_progress', label: '进行中' },
+        { value: 'done', label: '已完成' }, { value: 'cancelled', label: '已取消' },
       ] },
       { key: 'priority', label: '优先级', kind: 'select', options: [
-        { value: 'low', label: '低' },
-        { value: 'medium', label: '中' },
-        { value: 'high', label: '高' },
+        { value: 'low', label: '低' }, { value: 'medium', label: '中' }, { value: 'high', label: '高' },
       ] },
       { key: 'due', label: '截止日期', kind: 'date' },
       { key: 'project', label: '所属项目', kind: 'entity-ref', refType: 'project' },
@@ -821,10 +1061,8 @@
     ];
     if (type === 'project') return [
       { key: 'status', label: '状态', kind: 'select', options: [
-        { value: 'active', label: '进行中' },
-        { value: 'paused', label: '暂停' },
-        { value: 'done', label: '已完成' },
-        { value: 'archived', label: '归档' },
+        { value: 'active', label: '进行中' }, { value: 'paused', label: '暂停' },
+        { value: 'done', label: '已完成' }, { value: 'archived', label: '归档' },
       ] },
       { key: 'description', label: '一句话简介', kind: 'textarea' },
       { key: 'startDate', label: '开始日期', kind: 'date' },
@@ -840,8 +1078,8 @@
   }
 
   function fieldHtml(f, value) {
-    const v = value == null ? '' : value;
     const id = 'f-' + f.key;
+    const v = value == null ? '' : value;
     let inner = '';
     if (f.kind === 'text') {
       inner = `<input id="${id}" type="text" value="${escapeHtml(v)}" />`;
@@ -873,9 +1111,7 @@
 
   function readFieldValue(f, el) {
     if (!el) return '';
-    if (f.kind === 'tags') {
-      return el.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
-    }
+    if (f.kind === 'tags') return el.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
     if (f.kind === 'object') {
       const obj = {};
       for (const sub of f.fields) {
@@ -887,33 +1123,34 @@
     return el.value;
   }
 
-  // ====== Import link modal ======
+  // ============================ Import link modal =====================
   function openImportLinkModal() {
     const html = `
       <div class="editor">
-        <div class="editor-row"><label>URL</label><input id="imp-url" placeholder="https://..." /></div>
+        <div class="editor-row"><label>URL</label><input id="imp-url" placeholder="https://..." autofocus /></div>
         <div class="editor-row"><label>标题（可选）</label><input id="imp-title" placeholder="留空则自动获取页面标题" /></div>
         <div class="editor-row"><label>标签</label><input id="imp-tags" placeholder="逗号分隔" /></div>
         <div class="editor-row" style="align-items:flex-start;">
           <label>抓取方式</label>
-          <div style="flex:1;">
-            <label style="display:flex; gap:6px; align-items:center; padding:6px 0;">
+          <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+            <label style="display:flex; gap:6px; align-items:center; padding:8px 10px; border:1px solid var(--border); border-radius: var(--r-sm); cursor:pointer;">
               <input type="radio" name="imp-mode" value="light" checked />
-              <span>轻量（仅元信息 + 封面）</span>
+              <span><strong>轻量</strong> · 仅元信息（标题 / 封面 / 描述）</span>
             </label>
-            <label style="display:flex; gap:6px; align-items:center; padding:6px 0;">
+            <label style="display:flex; gap:6px; align-items:center; padding:8px 10px; border:1px solid var(--border); border-radius: var(--r-sm); cursor:pointer;">
               <input type="radio" name="imp-mode" value="deep" />
-              <span>深度抓取（提取正文 → Markdown，离线可读）</span>
+              <span><strong>深度</strong> · 抓取全文 → Markdown，离线可读</span>
             </label>
           </div>
         </div>
-        <div id="imp-preview" class="muted"></div>
       </div>`;
     openModal({
       title: '导入链接',
+      type: 'link',
+      prefixTitle: '链接',
       body: html,
       footer: `<button class="btn" data-close>取消</button>
-               <button class="btn btn-primary" id="imp-go">抓取并保存</button>`,
+               <button class="btn btn-primary" id="imp-go">${iconSvg('check')} 抓取并保存</button>`,
     });
     $('#imp-go').addEventListener('click', async () => {
       const url = $('#imp-url').value.trim();
@@ -923,7 +1160,7 @@
       if (!url) { toast('请填写 URL', 'error'); return; }
       const btn = $('#imp-go');
       btn.disabled = true;
-      btn.textContent = '抓取中…';
+      btn.innerHTML = `<span class="spinner"></span> 抓取中…`;
       try {
         const result = await api.importLink({ url, title, tags, deep });
         if (result.data?.fetchStatus === 'failed') {
@@ -935,11 +1172,11 @@
         location.hash = `#/entity/${encodeURIComponent(result.id)}`;
       } catch (err) { toast(err.message, 'error'); }
       btn.disabled = false;
-      btn.textContent = '抓取并保存';
+      btn.innerHTML = `${iconSvg('check')} 抓取并保存`;
     });
   }
 
-  // ====== Entity detail page ======
+  // ============================ Entity detail page ====================
   async function renderEntity(id) {
     let entity;
     try { entity = await api.read(id); } catch (err) {
@@ -952,8 +1189,8 @@
     const main = $('#main');
     main.innerHTML = `
       <div class="detail">
-        <div class="detail-header">
-          <div class="detail-avatar">${escapeHtml(initials(entity.data.name || entity.data.title || entity.slug))}</div>
+        <div class="detail-hero" data-type="${entity.type}">
+          ${entity.type === 'person' ? avatar(entity.data.name || entity.slug, 'lg') : ''}
           <div style="flex:1; min-width:0;">
             <h2 class="detail-title">${escapeHtml(entity.data.title || entity.data.name || entity.slug)}</h2>
             <div class="detail-meta">
@@ -1036,48 +1273,35 @@
   function renderEntityEmbed(entity) {
     if (entity.type !== 'link') return '';
     const d = entity.data;
-    const previewHtml = linkCardHtml({
-      title: d.title,
-      url: d.url,
-      description: d.description,
-      cover: d.cover,
-      site: d.site,
-    });
-    return `<div class="embed">${previewHtml}</div>`;
+    return `<div class="embed">${linkCardHtml({ title: d.title, url: d.url, description: d.description, cover: d.cover, site: d.site })}</div>`;
   }
 
   function renderEntityRelations(entity) {
-    // Find related items via wikilinks in body.
     if (!entity.body) return '';
     const refs = [...entity.body.matchAll(/\[\[([^\]|]+?)(?:\|([^\]]+))?\]\]/g)].map((m) => m[1]);
     if (!refs.length) return '';
-    return `<div class="dash-section" style="margin-top: 28px;">
-      <h3>交叉引用</h3>
-      <div class="muted">${refs.length} 处引用，渲染时已尝试解析。</div>
+    return `<div class="dash-section" style="margin-top: var(--sp-7);">
+      <div class="dash-section-header"><h3 class="dash-section-title">交叉引用</h3></div>
+      <div class="muted">${refs.length} 处引用，渲染时已尝试解析。点击 wikilink 跳转。</div>
     </div>`;
   }
 
-  // ====== Wikilink clicks ======
+  // ============================ Wikilinks ============================
   function bindWikilinks(root) {
     root.querySelectorAll('[data-wikilink]').forEach((el) => {
       el.addEventListener('click', (e) => {
         e.preventDefault();
         const target = el.dataset.wikilink;
-        // Open existing entity by id if format is "dir/slug"
         if (target.includes('/')) {
           location.hash = `#/entity/${encodeURIComponent(target)}`;
         } else {
-          // Try as slug across all types
-          for (const t of ['person', 'task', 'project', 'link']) {
-            location.hash = `#/entity/${encodeURIComponent(state.config.directories[t] + '/' + target)}`;
-            return;
-          }
+          location.hash = `#/entity/${encodeURIComponent(state.config.directories.person + '/' + target)}`;
         }
       });
     });
   }
 
-  // ====== Shared render helpers ======
+  // ============================ Shared render helpers =================
   function renderTagRow(tags) {
     if (!tags || !tags.length) return '';
     return `<div class="tag-row" style="margin-top:8px;">${tags.map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join('')}</div>`;
@@ -1086,12 +1310,8 @@
     return ({ todo: '待办', in_progress: '进行中', done: '已完成', cancelled: '已取消',
               active: '活跃', dormant: '久未联系', archived: '已归档', paused: '暂停' })[s] || s || '';
   }
-  function priorityLabel(p) {
-    return ({ low: '低', medium: '中', high: '高' })[p] || p || '';
-  }
-  function typeLabel(t) {
-    return ({ person: '人物', task: '任务', project: '项目', link: '链接' })[t] || t;
-  }
+  function priorityLabel(p) { return ({ low: '低', medium: '中', high: '高' })[p] || p || ''; }
+  function typeLabel(t) { return ({ person: '人物', task: '任务', project: '项目', link: '链接' })[t] || t; }
   function shortUrl(u) { return String(u).replace(/^https?:\/\//, '').slice(0, 40); }
   function socialUrl(kind, v) {
     const s = String(v).trim().replace(/^@/, '');
@@ -1101,52 +1321,215 @@
     if (kind === 'linkedin') return `https://www.linkedin.com/in/${s}`;
     return s;
   }
-
   function attachRowHandlers(root) {
     root.querySelectorAll('[data-entity-id]').forEach((el) => {
-      el.addEventListener('click', () => {
-        const id = el.dataset.entityId;
-        location.hash = `#/entity/${encodeURIComponent(id)}`;
-      });
+      el.addEventListener('click', () => { location.hash = `#/entity/${encodeURIComponent(el.dataset.entityId)}`; });
     });
   }
 
-  // ====== Search ======
+  // ============================ Search ================================
   function setupSearch() {
     const input = $('#search-input');
     const results = $('#search-results');
+    const close = () => results.classList.add('hidden');
     const run = debounce(async () => {
       const q = input.value.trim();
-      if (!q) { results.classList.add('hidden'); return; }
+      if (!q) { close(); return; }
       try {
         const { items } = await api.search(q);
+        state.searchResults = items.slice(0, 12);
+        state.searchActiveIndex = -1;
         if (!items.length) {
           results.innerHTML = `<div class="search-result"><div class="search-result-meta">无结果</div></div>`;
         } else {
-          results.innerHTML = items.slice(0, 12).map((it) => `
-            <div class="search-result" data-id="${escapeHtml(it.id)}">
-              <div class="search-result-title">${escapeHtml(it.data.title || it.data.name || it.slug)}</div>
-              <div class="search-result-meta">${typeLabel(it.type)} · ${escapeHtml(it.data.status || '')} · ${fmtDateTime(it.data.updated)}</div>
-            </div>`).join('');
+          results.innerHTML = items.slice(0, 12).map((it, i) => {
+            const t = it.type;
+            return `<div class="search-result ${i === state.searchActiveIndex ? 'is-active' : ''}" data-id="${escapeHtml(it.id)}" data-index="${i}">
+              <span class="search-result-type ${t}">${typeLabel(t).slice(0, 1)}</span>
+              <span class="search-result-title">${escapeHtml(it.data.title || it.data.name || it.slug)}</span>
+              <span class="search-result-meta">${fmtDateTime(it.data.updated)}</span>
+            </div>`;
+          }).join('');
         }
         results.classList.remove('hidden');
         results.querySelectorAll('.search-result[data-id]').forEach((r) => {
           r.addEventListener('click', () => {
             location.hash = `#/entity/${encodeURIComponent(r.dataset.id)}`;
             input.value = '';
-            results.classList.add('hidden');
+            close();
           });
         });
       } catch (err) { /* ignore */ }
     }, 200);
     input.addEventListener('input', run);
     input.addEventListener('focus', () => { if (input.value) run(); });
+    input.addEventListener('keydown', (e) => {
+      if (!results.classList.contains('hidden') && state.searchResults.length) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          state.searchActiveIndex = Math.min(state.searchResults.length - 1, state.searchActiveIndex + 1);
+          updateActiveSearchResult();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          state.searchActiveIndex = Math.max(0, state.searchActiveIndex - 1);
+          updateActiveSearchResult();
+        } else if (e.key === 'Enter' && state.searchActiveIndex >= 0) {
+          e.preventDefault();
+          const sel = state.searchResults[state.searchActiveIndex];
+          location.hash = `#/entity/${encodeURIComponent(sel.id)}`;
+          input.value = '';
+          close();
+        } else if (e.key === 'Escape') {
+          close();
+        }
+      }
+    });
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.search')) results.classList.add('hidden');
+      if (!e.target.closest('.search')) close();
+    });
+  }
+  function updateActiveSearchResult() {
+    $$('.search-result').forEach((el, i) => {
+      el.classList.toggle('is-active', i === state.searchActiveIndex);
     });
   }
 
-  // ====== Theme ======
+  // ============================ Command Palette (Cmd+K) ================
+  function openCmdK() {
+    const root = $('#cmdk-root');
+    root.innerHTML = `
+      <div class="cmdk-backdrop">
+        <div class="cmdk">
+          <div class="cmdk-input-row">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input class="cmdk-input" id="cmdk-input" placeholder="搜索人物、任务、项目、链接或输入命令…" autofocus />
+          </div>
+          <div class="cmdk-results" id="cmdk-results"></div>
+        </div>
+      </div>`;
+    const input = $('#cmdk-input');
+    const results = $('#cmdk-results');
+    let activeIndex = 0;
+    let items = [];
+
+    function getCommands() {
+      return [
+        { type: 'command', id: 'cmd-new-person', label: '新建人物', icon: 'plus' },
+        { type: 'command', id: 'cmd-new-task', label: '新建任务', icon: 'plus' },
+        { type: 'command', id: 'cmd-new-project', label: '新建项目', icon: 'plus' },
+        { type: 'command', id: 'cmd-import-link', label: '导入链接', icon: 'link' },
+        { type: 'command', id: 'cmd-theme-light', label: '主题：浅色', icon: 'sun' },
+        { type: 'command', id: 'cmd-theme-dark', label: '主题：深色', icon: 'moon' },
+        { type: 'command', id: 'cmd-theme-sepia', label: '主题：复古', icon: 'palette' },
+        { type: 'command', id: 'cmd-settings', label: '打开设置', icon: 'settings' },
+      ];
+    }
+
+    function render() {
+      const q = input.value.trim().toLowerCase();
+      const all = [
+        ...getCommands(),
+        ...state.entities.person.map((e) => ({ type: e.type, id: e.id, label: e.data.name || e.slug })),
+        ...state.entities.task.map((e) => ({ type: e.type, id: e.id, label: e.data.title || e.slug })),
+        ...state.entities.project.map((e) => ({ type: e.type, id: e.id, label: e.data.title || e.slug })),
+        ...state.entities.link.map((e) => ({ type: e.type, id: e.id, label: e.data.title || e.slug })),
+      ];
+      items = q ? all.filter((it) => it.label.toLowerCase().includes(q) || (it.type !== 'command' && it.id.toLowerCase().includes(q))) : all.slice(0, 12);
+      if (activeIndex >= items.length) activeIndex = Math.max(0, items.length - 1);
+
+      if (!items.length) {
+        results.innerHTML = `<div class="cmdk-empty">没有匹配项</div>`;
+        return;
+      }
+
+      const commands = items.filter((it) => it.type === 'command');
+      const entities = items.filter((it) => it.type !== 'command');
+      const grouped = [];
+      if (commands.length) {
+        grouped.push(`<div class="cmdk-section">命令</div>`);
+        grouped.push(commands.map((it, i) => renderItem(it, items.indexOf(it))).join(''));
+      }
+      if (entities.length) {
+        if (commands.length) grouped.push(`<div style="height: 6px;"></div>`);
+        grouped.push(`<div class="cmdk-section">实体</div>`);
+        grouped.push(entities.map((it) => renderItem(it, items.indexOf(it))).join(''));
+      }
+      results.innerHTML = grouped.join('');
+      $$('.cmdk-item').forEach((el) => {
+        el.addEventListener('click', () => execute(el.dataset.index));
+      });
+    }
+    function renderItem(it, index) {
+      const isCmd = it.type === 'command';
+      const badge = isCmd ? `<span class="item-type-badge command">⌘</span>` : `<span class="item-type-badge ${it.type}">${typeLabel(it.type).slice(0, 1)}</span>`;
+      return `<div class="cmdk-item ${index === activeIndex ? 'is-active' : ''}" data-index="${index}">${badge}<span>${escapeHtml(it.label)}</span></div>`;
+    }
+    function execute(idx) {
+      const it = items[idx];
+      if (!it) return;
+      if (it.type === 'command') {
+        const cmds = {
+          'cmd-new-person': () => openEntityModal('person'),
+          'cmd-new-task': () => openEntityModal('task'),
+          'cmd-new-project': () => openEntityModal('project'),
+          'cmd-import-link': () => openImportLinkModal(),
+          'cmd-theme-light': () => { state.theme = 'light'; applyTheme(); },
+          'cmd-theme-dark': () => { state.theme = 'dark'; applyTheme(); },
+          'cmd-theme-sepia': () => { state.theme = 'sepia'; applyTheme(); },
+          'cmd-settings': () => { location.hash = '#/settings'; },
+        };
+        close();
+        cmds[it.id]?.();
+      } else {
+        close();
+        location.hash = `#/entity/${encodeURIComponent(it.id)}`;
+      }
+    }
+
+    input.addEventListener('input', () => { activeIndex = 0; render(); });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); activeIndex = Math.min(items.length - 1, activeIndex + 1); render(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); activeIndex = Math.max(0, activeIndex - 1); render(); }
+      else if (e.key === 'Enter') { e.preventDefault(); execute(activeIndex); }
+      else if (e.key === 'Escape') { close(); }
+    });
+
+    const close = () => {
+      root.innerHTML = '';
+      document.removeEventListener('keydown', onGlobalKey);
+    };
+    const onGlobalKey = (e) => {
+      if (e.key === 'Escape' && root.innerHTML) close();
+    };
+    document.addEventListener('keydown', onGlobalKey);
+
+    // Click outside to close
+    $('.cmdk-backdrop').addEventListener('click', (e) => {
+      if (e.target.classList.contains('cmdk-backdrop')) close();
+    });
+
+    // Preload entities
+    Promise.all([
+      api.list('person').then((d) => state.entities.person = d),
+      api.list('task').then((d) => state.entities.task = d),
+      api.list('project').then((d) => state.entities.project = d),
+      api.list('link').then((d) => state.entities.link = d),
+    ]).then(() => render()).catch(() => render());
+
+    setTimeout(() => input.focus(), 30);
+  }
+
+  function setupCmdK() {
+    $('#cmdk-btn').addEventListener('click', openCmdK);
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        openCmdK();
+      }
+    });
+  }
+
+  // ============================ Theme =================================
   function applyTheme() {
     document.documentElement.dataset.theme = state.theme;
     localStorage.setItem('sb-theme', state.theme);
@@ -1154,16 +1537,20 @@
   function setupTheme() {
     applyTheme();
     $('#theme-toggle').addEventListener('click', () => {
-      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      const themes = ['light', 'dark', 'sepia'];
+      const next = themes[(themes.indexOf(state.theme) + 1) % themes.length];
+      state.theme = next;
       applyTheme();
+      toast(`主题：${next === 'light' ? '浅色' : next === 'dark' ? '深色' : '复古'}`, 'info');
     });
   }
 
-  // ====== Bootstrap ======
+  // ============================ Bootstrap =============================
   async function boot() {
     setupMarked();
     setupSearch();
     setupTheme();
+    setupCmdK();
     renderSidebar();
     try {
       state.config = await api.config.get();
