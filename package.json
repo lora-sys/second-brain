@@ -1,0 +1,30 @@
+{
+  "name": "second-brain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Personal second-brain dashboard that writes to your Obsidian vault",
+  "keywords": ["obsidian", "markdown", "knowledge-base", "dashboard", "pkm", "second-brain"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch server.mjs",
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check lib/server.mjs && node --check lib/vault.mjs && node --check lib/frontmatter.mjs && node --check lib/linkfetch.mjs"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "jsdom": "^24.1.0",
+    "marked": "^14.1.0"
+  },
+  "homepage": "https://github.com/lora-sys/second-brain",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lora-sys/second-brain.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lora-sys/second-brain/issues"
+  }
+}

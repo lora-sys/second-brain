@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Runtime data
+data/
+logs/
+
+# Recordings (kept in docs/assets/ for repo; private recordings stay out)
+recordings/*.webm
+!recordings/.gitkeep
+!docs/assets/demo.webm
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local config overrides - each user sets their own vaultPath via Settings
+config.local.json
+.env
+.env.local
+
+# Local user config (each user gets this generated on first run)
+config.json

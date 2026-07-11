@@ -1,0 +1,12 @@
+{
+  "vaultPath": "/home/lora/文档/Obsidian Vault",
+  "port": 3939,
+  "host": "127.0.0.1",
+  "directories": {
+    "person": "10-People",
+    "task": "20-Tasks",
+    "project": "30-Projects",
+    "link": "40-Links",
+    "dashboard": "00-Dashboard"
+  }
+}
