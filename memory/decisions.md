@@ -75,3 +75,11 @@
 - **Config search order finalized** — `$SECOND_BRAIN_CONFIG` → cwd → `$XDG_CONFIG_HOME/second-brain/` → `~/.config/second-brain/`. The Tauri bundled app's first launch will likely fail to find a config; that's a UX problem for v0.4.7 (settings UI), not a v0.4.4 problem.
 - **`walkdir` with `max_depth(1)`** — entity directories are flat by convention (no nested folders of .md files). Attachment subdirectories are out of scope.
 - **Path canonicalization in `find_config`** — returned paths are absolute and stable. Tests that compare with `tempdir` paths now pass reliably.
+
+## 2026-07-12 (v0.4.5 frontend rewire landed)
+
+- **Tauri bridge in public/app.js** (commit pending merge) — probes both Tauri 2 (`window.__TAURI__.core.invoke`) and Tauri 1 (`window.__TAURI_INVOKE__`) shapes. Falls back to fetch if neither. Logs warn on invoke failure then falls through.
+- **Rewired two methods** — `api.config.get()` and `api.list()` (no type). All other API methods still use fetch (no Rust counterpart yet).
+- **Rust Config serialized as camelCase** — added `#[serde(rename_all = "camelCase")]`. Bug caught by Tauri-sim test: state.config.vaultPath was undefined in Tauri mode because Rust returned snake_case `vault_path`. Without the Tauri-sim test this would have shipped broken.
+- **Tauri-sim test pattern** — inject a mock `window.__TAURI__` via Playwright's `addInitScript`, capture `window.__invokeLog` to verify which commands actually got invoked. This pattern is reusable for v0.4.7 (full E2E) and for any future bridge test.
+- **`vault_list_all` returns Vec directly, JS wraps in {items}** — small shape adapter in `normalizeTauri`. v0.4.4 already returned Vec, JS expected {items: [...]}. Adapter is one line.

@@ -57,3 +57,11 @@
 - **Tauri 2.0 custom commands auto-allowed** — you don't need an entry in `capabilities/default.json` for `#[tauri::command]` functions you've registered via `invoke_handler(tauri::generate_handler![...])`. Capabilities only matter for plugins (shell, fs, http, etc.).
 - **`serde_yaml = "0.9"` is deprecated upstream** — but it's the only stable release. We use `from_str` (safe) not `from_reader` so the deprecation (which warns about unsafe load methods) doesn't apply to us. Migrate to `serde_yml` when stable.
 - **Reimplementing JS logic in Rust duplicates the contract** — write tests that pin the contract, otherwise the two implementations will silently diverge. The 4 `parse_frontmatter_*` tests are the spec for the frontmatter parser; if the JS parser ever changes, those tests need to update.
+
+## Frontend rewire (v0.4.5)
+
+- **Mock the Tauri API in Playwright via `addInitScript`** — instead of launching a real Tauri binary (slow, GPU-bound), inject `window.__TAURI__ = {core: {invoke: async (cmd, args) => {...}}}` before the SPA loads. Capture the call log on `window.__invokeLog` to verify which commands actually got invoked. Fast, deterministic, works in CI.
+- **Tauri 2 invoke path: `window.__TAURI__.core.invoke(cmd, args)`** — Tauri 1 uses `window.__TAURI_INVOKE__(cmd, args)`. Probe both shapes.
+- **Snake_case vs camelCase is a real cross-language trap** — Rust structs default to snake_case serialization; JS code usually reads camelCase. Add `#[serde(rename_all = "camelCase")]` on every DTO that crosses the JS boundary, or be prepared to translate in JS. The bug only shows up when you actually exercise the bridge end-to-end — a unit test on each side doesn't catch it.
+- **Bridge pattern: invoke-or-fetch with shape adapter** — when a single API method might be served by either Rust or fetch (depending on whether we're in Tauri), a wrapper that tries invoke first, falls back on error, and normalizes shape is simpler than two parallel methods. The trade-off is silent fallback on invoke errors; log a warn so dev tools can see.
+- **Tauri init script timing matters** — set up the mock BEFORE `goto()`. If you set it after, the SPA has already loaded with `__TAURI__` undefined and the bridge has already decided to use fetch.

@@ -24,6 +24,57 @@
     searchActiveIndex: -1,
   };
 
+  // ============================ Tauri bridge ==========================
+  // v0.4.5 — when running inside the Tauri webview, route API calls
+  // through invoke() so they hit the Rust commands in src-tauri (v0.4.4).
+  // When running in a plain browser (web showcase), fall back to fetch()
+  // against the Node HTTP server.
+
+  const tauri = (() => {
+    try {
+      // Tauri 2.0 exposes __TAURI_INTERNALS__ in the webview.
+      // The invoke function lives at window.__TAURI__.core.invoke (v2)
+      // or window.__TAURI_INVOKE__ (older). We probe both.
+      if (window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') {
+        return { kind: 'v2', invoke: window.__TAURI__.core.invoke };
+      }
+      if (typeof window.__TAURI_INVOKE__ === 'function') {
+        return { kind: 'v1', invoke: window.__TAURI_INVOKE__ };
+      }
+    } catch {}
+    return null;
+  })();
+
+  async function invokeOrFetch(cmd, args, fetchPath, fetchOpts = {}) {
+    if (tauri) {
+      try {
+        const data = await tauri.invoke(cmd, args || {});
+        return normalizeTauri(cmd, data);
+      } catch (err) {
+        const msg = String((err && err.message) || err);
+        console.warn(`[bridge] invoke('${cmd}') failed: ${msg}; falling back to fetch`);
+        // Fall through to fetch.
+      }
+    }
+    const res = await fetch(fetchPath, {
+      headers: { 'content-type': 'application/json' },
+      ...fetchOpts,
+    });
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  // Normalize the shape returned by Rust commands to match what the rest
+  // of the SPA expects from the Node HTTP server. Right now only
+  // vault_list_all needs shape adaptation (returns Vec<Entity> vs the
+  // {items: [...]} envelope).
+  function normalizeTauri(cmd, data) {
+    if (cmd === 'vault_list_all') return { items: data || [] };
+    return data;
+  }
+
   // ============================ API ===================================
   const api = {
     async req(path, opts = {}) {
@@ -41,10 +92,19 @@
     put(path, body) { return this.req(path, { method: 'PUT', body: JSON.stringify(body || {}) }); },
     del(path) { return this.req(path, { method: 'DELETE' }); },
     config: {
-      get: () => api.get('/api/config'),
+      // v0.4.5 — Tauri path: invoke('config_get'). Browser path: fetch.
+      get: () => invokeOrFetch('config_get', {}, '/api/config'),
       put: (body) => api.put('/api/config', body),
     },
-    list: (type) => api.get(type ? `/api/entities?type=${type}` : '/api/entities').then(d => d.items),
+    // v0.4.5 — Tauri path: invoke('vault_list_all'). Browser path: fetch.
+    list: (type) => {
+      if (tauri && !type) {
+        // No filtering on the Rust side yet (would need vault_list_by_type);
+        // we use vault_list_all and filter client-side.
+        return invokeOrFetch('vault_list_all', {}, '/api/entities').then(d => d.items);
+      }
+      return api.get(type ? `/api/entities?type=${type}` : '/api/entities').then(d => d.items);
+    },
     read: (id) => api.get(`/api/entities/${encodeURIComponent(id)}`),
     create: (body) => api.post('/api/entities', body),
     update: (id, body) => api.put(`/api/entities/${encodeURIComponent(id)}`, body),
@@ -53,6 +113,9 @@
     dashboard: () => api.get('/api/dashboard'),
     importLink: (body) => api.post('/api/links/import', body),
   };
+
+  // Expose bridge state for cockpit + dev-tools introspection
+  window.__secondBrainBridge = { tauri: !!tauri, kind: tauri ? tauri.kind : null };
 
   // ============================ Helpers ===============================
   const $ = (sel, root = document) => root.querySelector(sel);
