@@ -48,3 +48,12 @@
 - **WebKit prefers Wayland over X11 by default** — on a system with both, Tauri's first launch may fail with "Error 71 dispatching to Wayland display". Workaround: `GDK_BACKEND=x11 ./second-brain` forces X11. On a real Linux desktop the Wayland path usually works; the sandbox issue is a one-off.
 - **`cargo build` cold takes ~30s for ~440 crates** — webkit2gtk-gtk and friends are heavy. After the first build, incremental builds are ~0.5s. The first build is the real cost.
 - **`Cargo.lock` should be committed for binaries** — Tauri's `cargo tauri build` produces a deterministic AppImage from a locked Cargo.lock. Don't `.gitignore` it.
+
+## Tauri commands (v0.4.4)
+
+- **Parallel tests + cwd = race condition** — Rust runs tests in parallel by default. Tests that `set_current_dir` race with each other. Use `$SECOND_BRAIN_CONFIG` (env var, per-test isolated) instead of cwd for config-aware tests.
+- **`Path::ends_with('\n')` lost when you `lines().join("\n")`** — `str::lines()` strips line terminators. If you need to preserve a trailing newline, check explicitly: `if raw.ends_with('\n') && !body.ends_with('\n') { body.push('\n'); }`.
+- **`PathBuf::from("config.json")` is relative** — comparison with absolute `tempdir.path()` paths fails. Always `canonicalize()` before returning or comparing.
+- **Tauri 2.0 custom commands auto-allowed** — you don't need an entry in `capabilities/default.json` for `#[tauri::command]` functions you've registered via `invoke_handler(tauri::generate_handler![...])`. Capabilities only matter for plugins (shell, fs, http, etc.).
+- **`serde_yaml = "0.9"` is deprecated upstream** — but it's the only stable release. We use `from_str` (safe) not `from_reader` so the deprecation (which warns about unsafe load methods) doesn't apply to us. Migrate to `serde_yml` when stable.
+- **Reimplementing JS logic in Rust duplicates the contract** — write tests that pin the contract, otherwise the two implementations will silently diverge. The 4 `parse_frontmatter_*` tests are the spec for the frontmatter parser; if the JS parser ever changes, those tests need to update.
