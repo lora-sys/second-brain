@@ -1,0 +1,13 @@
+{
+  "generated": "2026-07-12",
+  "files": {
+    "AGENTS.md": "project contract",
+    "PROJECT_STATUS.md": "live board",
+    "docs/INDEX.md": "master TOC",
+    "docs/product/vision.md": "vision",
+    "docs/product/roadmap.md": "roadmap",
+    "docs/architecture/system.md": "system arch",
+    "docs/decisions/0001-0004": "ADRs",
+    "memory/project-memory.md": "project memory"
+  }
+}

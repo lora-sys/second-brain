@@ -1,31 +1,44 @@
-## 改了什么
+## Related Issue
+- Closes #
 
-<!-- 一句话说清这个 PR 干了什么 -->
+## Summary
+<2–4 bullets describing what changed>
 
-## 关联的 Issue
+## Motivation
+<why; cite Issue/ADR IDs>
 
-<!-- `Closes #123` 或 `Refs #456` -->
+## Changed Files
+- key files (auto by GitHub)
 
-## 改动类型
+## Architecture Impact
+- New module? Cite ADR or commit to writing one.
+- Schema change? Cite migration + rollback.
+- Public API change? Cite `docs/api/...` and version note.
 
-- [ ] Bug fix
-- [ ] 新功能
-- [ ] 重构
-- [ ] 文档
-- [ ] 样式 / UI
-- [ ] 测试
+## Testing
+- Unit: <% coverage delta>
+- Integration / contract:
+- E2E / browser evidence: <link to docs/evidence/<id>/>
 
-## 怎么测
+## Evidence
+- docs/evidence/<id>/change-summary.md
+- docs/evidence/<id>/test-results/
+- docs/evidence/<id>/screenshots/
 
-<!-- 一步步描述怎么手动验证这个改动 -->
+## Reviewer Coverage
+- [ ] bug-hunter
+- [ ] behavior-reviewer
+- [ ] architecture-reviewer
+- [ ] ui-reviewer (if UI change)
+- [ ] security-reviewer (if auth/PII/secrets)
 
-## 截图 / 录屏（如果改了 UI）
-
-<!-- 必填 -->
-
-## Checklist
-
-- [ ] 跑过 `npm run check`
-- [ ] 浏览器里手动验过
-- [ ] 如果改了 API，更新了 README / docs/
-- [ ] 没有无关改动（顺手重命名变量之类）
+## Definition of Done
+- [ ] All ACs in the linked Issue green
+- [ ] `npm run check` passes
+- [ ] E2E tests green
+- [ ] No console errors
+- [ ] No unhandled rejections in server log
+- [ ] Evidence complete
+- [ ] Reviewer reports attached
+- [ ] PROJECT_STATUS.md updated
+- [ ] ADR filed (if architecture-affecting)
