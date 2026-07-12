@@ -22,7 +22,8 @@ _Last updated: 2026-07-12 by @coordinator_
 | #v0.4.3 | Tauri 2.0 init in `src-tauri/`, config, capabilities | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.4 | config_get + vault_list_all Rust Tauri commands | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.4.x | vault_read / vault_create / vault_update / vault_delete / config_set / vault_search / links_import | Tauri | @coordinator | (follow-ups) | Backlog |
-| #v0.4.5 | Replace fetch() with __TAURI__.invoke() | Tauri | @coordinator | (next round) | Planning |
+| #v0.4.5 | Frontend rewire (config_get + vault_list_all → invoke) | Tauri | @coordinator | merged | ✅ Done |
+| #v0.4.6 | Tauri build pipeline + GitHub Actions + AppImage | Tauri | @coordinator | (next round) | Planning |
 
 ## Backlog (v0.4, in dependency order)
 
@@ -77,6 +78,8 @@ _None._
 
 | PR | Title | Evidence |
 |---|---|---|
+| `4cf242a` | docs: memory updates for v0.4.5 | (in v0.4.5 evidence) |
+| (pending) | feat(bridge): v0.4.5 frontend rewire | [docs/evidence/v0.4.5/](evidence/v0.4.5/) |
 | `3611244` | feat(tauri): v0.4.4 vault commands (config_get + vault_list_all) | [docs/evidence/v0.4.4/](evidence/v0.4.4/) |
 | `84b16cb` | feat(tauri): v0.4.3 init — Tauri 2.0 desktop shell scaffolding | [docs/evidence/v0.4.3/](evidence/v0.4.3/) |
 | `ab79c3b` | feat(cockpit): v0.4.c1 cockpit skeleton (sidebar + multi-pane shell) | [docs/evidence/v0.4.c1/](evidence/v0.4.c1/) |
