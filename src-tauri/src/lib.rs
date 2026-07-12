@@ -31,6 +31,7 @@ use std::path::PathBuf;
 use walkdir::WalkDir;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Config {
     pub vault_path: String,
     #[serde(default)]
@@ -309,7 +310,7 @@ mod tests {
 
         let cfg_path = dir.path().join("config.json");
         let cfg_json = format!(
-            r#"{{"vault_path":"{}","directories":{{"person":"10-People","task":"20-Tasks"}}}}"#,
+            r#"{{"vaultPath":"{}","directories":{{"person":"10-People","task":"20-Tasks"}}}}"#,
             vault.display()
         );
         std::fs::write(&cfg_path, cfg_json).unwrap();
@@ -336,7 +337,7 @@ mod tests {
     fn config_get_reads_minimal_config() {
         let dir = tempfile::tempdir().expect("tempdir");
         let cfg_path = dir.path().join("config.json");
-        std::fs::write(&cfg_path, r#"{"vault_path":"/tmp/fake"}"#).unwrap();
+        std::fs::write(&cfg_path, r#"{"vaultPath":"/tmp/fake"}"#).unwrap();
         let prev = std::env::current_dir().expect("cwd");
         std::env::set_current_dir(dir.path()).expect("chdir");
         let result = config_get();
