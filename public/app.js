@@ -18,6 +18,8 @@
     tags: null,
     current: null,
     theme: localStorage.getItem('sb-theme') || 'light',
+    activeTagFilters: new Set(),  // for tag filter chips on list pages
+    allEntities: [],  // pre-loaded index for wikilink autocomplete
     searchResults: [],
     searchActiveIndex: -1,
   };
@@ -211,7 +213,92 @@
       html = `<pre>${escapeHtml(body)}</pre>`;
     }
     html = upgradeEmbeds(html, opts);
+    // Smart mentions: auto-link known entity names that aren't already linked.
+    html = applySmartMentions(html);
     return html;
+  }
+
+  // Scan rendered HTML and wrap known entity names in wikilink anchors.
+  // Skips text inside <a>, <code>, <pre>, and existing wikilinks.
+  function applySmartMentions(html) {
+    if (!html || !state.allEntities || state.allEntities.length === 0) return html;
+    // Sort by label length descending so longer names match first (e.g. "陈一-2" before "陈一")
+    const entities = [...state.allEntities].sort((a, b) => b.label.length - a.label.length);
+    // Use a DOM parser to walk the tree safely.
+    const wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    const skipTags = new Set(['A', 'CODE', 'PRE', 'SCRIPT', 'STYLE']);
+    const walker = document.createTreeWalker(wrap, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        let p = node.parentNode;
+        while (p && p !== wrap) {
+          if (p.nodeType === 1 && skipTags.has(p.tagName)) return NodeFilter.FILTER_REJECT;
+          p = p.parentNode;
+        }
+        // Skip wikilink children
+        if (node.parentNode && node.parentNode.classList && (node.parentNode.classList.contains('wikilink') || node.parentNode.classList.contains('auto-mention'))) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    const texts = [];
+    let n;
+    while ((n = walker.nextNode())) texts.push(n);
+    for (const text of texts) {
+      const s = text.nodeValue;
+      if (!s || s.length < 1) continue;
+      // Build match list for this text node
+      const matches = [];
+      for (const e of entities) {
+        // Find all occurrences of this entity's label
+        const lbl = e.label;
+        if (!lbl || lbl.length < 2) continue;
+        let from = 0;
+        while (true) {
+          const idx = s.indexOf(lbl, from);
+          if (idx < 0) break;
+          // Check it's at a word boundary
+          const before = idx > 0 ? s[idx - 1] : '';
+          const after = idx + lbl.length < s.length ? s[idx + lbl.length] : '';
+          const wordBefore = /[\w\u4e00-\u9fff]/.test(before);
+          const wordAfter = /[\w\u4e00-\u9fff]/.test(after);
+          if (!wordBefore && !wordAfter) {
+            matches.push({ start: idx, end: idx + lbl.length, entity: e });
+          }
+          from = idx + 1;
+        }
+      }
+      if (!matches.length) continue;
+      // Sort by start position, dedup overlapping (longer wins)
+      matches.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+      const nonOverlap = [];
+      let lastEnd = -1;
+      for (const m of matches) {
+        if (m.start >= lastEnd) {
+          nonOverlap.push(m);
+          lastEnd = m.end;
+        }
+      }
+      if (!nonOverlap.length) continue;
+      // Build replacement DOM nodes
+      const frag = document.createDocumentFragment();
+      let cursor = 0;
+      for (const m of nonOverlap) {
+        if (m.start > cursor) frag.appendChild(document.createTextNode(s.slice(cursor, m.start)));
+        const a = document.createElement('a');
+        a.className = 'wikilink auto-mention';
+        a.dataset.wikilink = `${state.config?.directories?.[m.entity.type] || m.entity.type}/${m.entity.slug}`;
+        a.href = '#';
+        a.textContent = s.slice(m.start, m.end);
+        frag.appendChild(a);
+        cursor = m.end;
+      }
+      if (cursor < s.length) frag.appendChild(document.createTextNode(s.slice(cursor)));
+      // Replace text node with fragment
+      text.parentNode.replaceChild(frag, text);
+    }
+    return wrap.innerHTML;
   }
 
   function upgradeEmbeds(html) {
@@ -579,6 +666,66 @@
   }
 
   // ============================ Page: People ==========================
+  // Get all unique tags from a list of entities (counts each tag)
+  function collectTags(items) {
+    const out = {};
+    for (const e of items) for (const t of e.data?.tags || []) out[t] = (out[t] || 0) + 1;
+    return out;
+  }
+
+  // Wire up tag filter chip clicks after a list page has rendered.
+  function wireTagFilters(typeKey) {
+    document.querySelectorAll(`.tag-filter-chip[data-type="${typeKey}"]`).forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const tag = chip.dataset.tag;
+        if (state.activeTagFilters.has(tag)) state.activeTagFilters.delete(tag);
+        else state.activeTagFilters.add(tag);
+        // Re-render the current page
+        const hash = location.hash || '#/dashboard';
+        if (hash.startsWith('#/people')) renderPeople();
+        else if (hash.startsWith('#/projects')) renderProjects();
+        else if (hash.startsWith('#/links')) renderLinks();
+      });
+    });
+    const clear = document.querySelector('[data-action="clear-filters"]');
+    if (clear) clear.addEventListener('click', () => {
+      state.activeTagFilters.clear();
+      const hash = location.hash || '#/dashboard';
+      if (hash.startsWith('#/people')) renderPeople();
+      else if (hash.startsWith('#/projects')) renderProjects();
+      else if (hash.startsWith('#/links')) renderLinks();
+    });
+  }
+
+  // Render the tag filter bar. Returns HTML string (or empty string if no tags / no filters).
+  function renderTagFilterBar(items, typeKey) {
+    const tags = collectTags(items);
+    const entries = Object.entries(tags).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) return '';
+    const active = state.activeTagFilters;
+    const chips = entries.map(([t, n]) => {
+      const isActive = active.has(t);
+      return `<span class="tag-filter-chip ${isActive ? 'is-active' : ''}" data-tag="${escapeHtml(t)}" data-type="${typeKey}">
+        #${escapeHtml(t)} <span style="opacity:0.6">${n}</span>${isActive ? '<span class="chip-x">×</span>' : ''}
+      </span>`;
+    }).join('');
+    return `<div class="tag-filter">
+      <span class="tag-filter-label">筛选</span>
+      ${chips}
+      ${active.size ? `<span class="tag-filter-clear" data-action="clear-filters">清除</span>` : ''}
+    </div>`;
+  }
+
+  // Apply tag filter to a list. AND logic: entity must have ALL active tags.
+  function applyTagFilter(items) {
+    if (!state.activeTagFilters.size) return items;
+    return items.filter((e) => {
+      const tags = e.data?.tags || [];
+      for (const t of state.activeTagFilters) if (!tags.includes(t)) return false;
+      return true;
+    });
+  }
+
   async function renderPeople() {
     $('#page-title').textContent = '人物';
     const main = $('#main');
@@ -597,13 +744,24 @@
     const items = await api.list('person');
     state.entities.person = items;
     const list = $('#people-list');
+    // Tag filter bar
+    const filterBar = renderTagFilterBar(items, 'person');
+    if (filterBar) {
+      const bar = document.createElement('div');
+      bar.innerHTML = filterBar;
+      list.parentNode.insertBefore(bar.firstChild, list);
+    }
+    const filtered = applyTagFilter(items);
     if (!items.length) {
       list.innerHTML = emptyStateHTML('user', '还没有人物', '点击右上角新增你的第一个人物卡片。');
+    } else if (!filtered.length) {
+      list.innerHTML = '<div class="empty"><h3>没有匹配</h3><p>当前筛选下没有人物。试试清除筛选？</p></div>';
     } else {
-      list.innerHTML = `<div class="grid">${items.map(personCardHtml).join('')}</div>`;
+      list.innerHTML = `<div class="grid">${filtered.map(personCardHtml).join('')}</div>`;
     }
     main.querySelector('[data-action="new-person"]').addEventListener('click', () => openEntityModal('person'));
     attachRowHandlers(list);
+    wireTagFilters('person');
   }
 
   function personCardHtml(p) {
@@ -675,6 +833,40 @@
     main.querySelectorAll('[data-action="add-to-col"]').forEach((btn) => {
       btn.addEventListener('click', () => openEntityModal('task', null, btn.dataset.status));
     });
+    // Inline status popover
+    main.querySelectorAll('[data-action="status-pop"]').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const card = el.closest('.kanban-card');
+        if (!card) return;
+        const id = card.dataset.entityId;
+        const currentStatus = el.dataset.status;
+        openStatusPopover(el, currentStatus, async (newStatus) => {
+          if (newStatus === currentStatus) return;
+          // Optimistic: move DOM
+          const col = card.parentElement;
+          col.removeChild(card);
+          const targetCol = document.querySelector(`.kanban-col[data-status="${newStatus}"]`);
+          const addBtn = targetCol.querySelector('.kanban-add');
+          targetCol.insertBefore(card, addBtn);
+          updateColCount(col);
+          updateColCount(targetCol);
+          el.dataset.status = newStatus;
+          el.className = `kanban-card-status status status-${newStatus}`;
+          el.textContent = ({ todo: '待办', in_progress: '进行中', done: '已完成', cancelled: '已取消' })[newStatus];
+          try {
+            await api.update(id, { data: { status: newStatus } });
+            const t = state.entities.task.find((x) => x.id === id);
+            if (t) { t.data.status = newStatus; t.data.updated = new Date().toISOString(); }
+            await refreshCounts();
+          } catch (err) {
+            toast('更新失败：' + err.message, 'error');
+            handleRoute();
+          }
+        });
+      });
+    });
     attachRowHandlers(kanban);
     initKanbanDnD(kanban);
   }
@@ -684,11 +876,57 @@
     return `<div class="kanban-card" data-entity-id="${escapeHtml(t.id)}" data-type="task" draggable="true">
       <div class="kanban-card-title">${escapeHtml(t.data.title || t.slug)}</div>
       <div class="kanban-card-meta">
+        <span class="kanban-card-status status status-${escapeHtml(t.data.status || 'todo')}" data-status="${escapeHtml(t.data.status || 'todo')}" data-action="status-pop">${statusLabel(t.data.status)}</span>
         <span class="priority-${escapeHtml(t.data.priority || 'medium')}">${priorityLabel(t.data.priority)}</span>
         ${t.data.due ? `<span style="color:${overdue ? 'var(--danger)' : 'inherit'}">${iconSvg('calendar', 11)} ${escapeHtml(t.data.due)}</span>` : ''}
         ${(t.data.tags || []).slice(0, 2).map((tg) => `<span class="tag">#${escapeHtml(tg)}</span>`).join('')}
       </div>
     </div>`;
+  }
+
+  // Click status pill to change status via popover.
+  function openStatusPopover(anchor, currentStatus, onPick) {
+    closeStatusPopover();
+    const pop = document.createElement('div');
+    pop.className = 'status-popover';
+    pop.dataset.role = 'status-popover';
+    const options = [
+      { v: 'todo', label: '待办' },
+      { v: 'in_progress', label: '进行中' },
+      { v: 'done', label: '已完成' },
+      { v: 'cancelled', label: '已取消' },
+    ];
+    pop.innerHTML = options.map((o) => `
+      <div class="status-popover-item ${o.v === currentStatus ? 'is-current' : ''}" data-status="${o.v}">
+        <span class="status status-${o.v}" style="pointer-events:none;">
+          <span></span><span>${o.label}</span>
+        </span>
+      </div>
+    `).join('');
+    document.body.appendChild(pop);
+    const rect = anchor.getBoundingClientRect();
+    pop.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+    pop.style.left = (rect.left + window.scrollX) + 'px';
+    pop.addEventListener('click', (e) => {
+      const item = e.target.closest('.status-popover-item');
+      if (!item) return;
+      e.stopPropagation();
+      onPick(item.dataset.status);
+      closeStatusPopover();
+    });
+    // Close on outside click
+    setTimeout(() => {
+      const handler = (ev) => {
+        if (!pop.contains(ev.target) && ev.target !== anchor) {
+          closeStatusPopover();
+          document.removeEventListener('mousedown', handler);
+        }
+      };
+      document.addEventListener('mousedown', handler);
+    }, 0);
+  }
+  function closeStatusPopover() {
+    document.querySelectorAll('.status-popover').forEach((el) => el.remove());
   }
 
   // ============================ Kanban drag-and-drop ===================
@@ -789,13 +1027,23 @@
     const items = await api.list('project');
     state.entities.project = items;
     const list = $('#projects-list');
+    const filterBar = renderTagFilterBar(items, 'project');
+    if (filterBar) {
+      const bar = document.createElement('div');
+      bar.innerHTML = filterBar;
+      list.parentNode.insertBefore(bar.firstChild, list);
+    }
+    const filtered = applyTagFilter(items);
     if (!items.length) {
       list.innerHTML = emptyStateHTML('folder', '还没有项目', '创建一个项目，把相关的任务、链接、人串起来。');
+    } else if (!filtered.length) {
+      list.innerHTML = '<div class="empty"><h3>没有匹配</h3><p>当前筛选下没有项目。</p></div>';
     } else {
-      list.innerHTML = `<div class="grid">${items.map(projectCardHtml).join('')}</div>`;
+      list.innerHTML = `<div class="grid">${filtered.map(projectCardHtml).join('')}</div>`;
     }
     main.querySelector('[data-action="new-project"]').addEventListener('click', () => openEntityModal('project'));
     attachRowHandlers(list);
+    wireTagFilters('project');
   }
 
   function projectCardHtml(p) {
@@ -826,13 +1074,23 @@
     const items = await api.list('link');
     state.entities.link = items;
     const list = $('#links-list');
+    const filterBar = renderTagFilterBar(items, 'link');
+    if (filterBar) {
+      const bar = document.createElement('div');
+      bar.innerHTML = filterBar;
+      list.parentNode.insertBefore(bar.firstChild, list);
+    }
+    const filtered = applyTagFilter(items);
     if (!items.length) {
       list.innerHTML = emptyStateHTML('link', '还没有链接', '粘贴一个 URL，抓取后会作为卡片保存。');
+    } else if (!filtered.length) {
+      list.innerHTML = '<div class="empty"><h3>没有匹配</h3><p>当前筛选下没有链接。</p></div>';
     } else {
-      list.innerHTML = `<div class="grid">${items.map(linkCardItemHtml).join('')}</div>`;
+      list.innerHTML = `<div class="grid">${filtered.map(linkCardItemHtml).join('')}</div>`;
     }
     main.querySelector('[data-action="import-link"]').addEventListener('click', openImportLinkModal);
     attachRowHandlers(list);
+    wireTagFilters('link');
   }
 
   function linkCardItemHtml(l) {
@@ -957,7 +1215,30 @@
   }
 
   // ============================ Entity modal =========================
-  function openEntityModal(type, existing, initialStatus) {
+  async function preloadAllEntities() {
+    if (state.allEntities.length > 0) return;
+    try {
+      const [p, t, pr, l] = await Promise.all([
+        api.list('person'), api.list('task'), api.list('project'), api.list('link'),
+      ]);
+      const all = [];
+      for (const e of p) all.push({ type: 'person', slug: e.slug, label: e.data.name || e.slug });
+      for (const e of t) all.push({ type: 'task', slug: e.slug, label: e.data.title || e.slug });
+      for (const e of pr) all.push({ type: 'project', slug: e.slug, label: e.data.title || e.slug });
+      for (const e of l) all.push({ type: 'link', slug: e.slug, label: e.data.title || e.slug });
+      // Dedup
+      const seen = new Set();
+      state.allEntities = all.filter((m) => {
+        const k = `${m.type}/${m.slug}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    } catch (e) { console.warn('preloadAllEntities failed', e); }
+  }
+
+  async function openEntityModal(type, existing, initialStatus) {
+    await preloadAllEntities();
     const isEdit = !!existing;
     const d = existing?.data || {};
     if (initialStatus) d.status = initialStatus;
@@ -1011,6 +1292,8 @@
       try {
         if (isEdit) await api.update(existing.id, { data, body });
         else await api.create({ type, title, data, body });
+        // Refresh wikilink autocomplete cache so the new entity is available.
+        state.allEntities = [];
         toast(isEdit ? '已保存' : '已创建', 'success');
         closeModal();
         if (isEdit) location.hash = `#/entity/${encodeURIComponent(existing.id)}`;
@@ -1022,6 +1305,7 @@
         if (!confirm('确定删除？此操作会从 Obsidian Vault 移除对应 .md 文件。')) return;
         try {
           await api.delete(existing.id);
+          state.allEntities = [];
           toast('已删除', 'success');
           closeModal();
           history.back();
@@ -1178,6 +1462,7 @@
 
   // ============================ Entity detail page ====================
   async function renderEntity(id) {
+    await preloadAllEntities();
     let entity;
     try { entity = await api.read(id); } catch (err) {
       $('#page-title').textContent = '未找到';
@@ -1551,9 +1836,11 @@
     setupSearch();
     setupTheme();
     setupCmdK();
+    if (window.__wikilinkAutocomplete) window.__wikilinkAutocomplete.init();
     renderSidebar();
     try {
       state.config = await api.config.get();
+      window.__appState = state;
     } catch (err) {
       toast('加载配置失败：' + err.message, 'error');
     }

@@ -23,3 +23,4 @@ config.json
 
 # Local test content (not part of the project)
 content/
+.playwright-cli/
