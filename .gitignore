@@ -24,3 +24,10 @@ config.json
 # Local test content (not part of the project)
 content/
 .playwright-cli/
+
+# Environment files (secrets)
+.env
+.env.local
+*.env
+!docs/config.example.env
+.codegraph/

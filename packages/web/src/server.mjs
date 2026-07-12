@@ -2,7 +2,7 @@
 // Serves a vanilla JS frontend + JSON API on a local-only port.
 // All data is stored as Markdown files inside the user's Obsidian vault.
 
-import { start, server } from './lib/server.mjs';
+import { startServer as start, httpServer as server } from '@second-brain/core';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

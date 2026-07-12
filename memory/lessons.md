@@ -25,3 +25,10 @@
 - **Demo videos are good evidence.** Recording the v0.3 demo with `playwright-cli screencast` produced a 60s webm that's clearer than any screenshot.
 - **The user wants to iterate, not be sold.** Don't over-promise. Ship small, get feedback.
 - **Adversarial review matters more than I thought.** A second pass catches things I wouldn't.
+
+## Agent apps (v0.4 audit)
+
+- **Agent apps have 2x the surface area.** Every UI feature has an AI counterpart. Every error path has a "what does the AI see" variant. Audit checklist must include AI-error and tool-failure scenarios.
+- **Never read a real .env into version control.** Even `diff`-ing a .env file can leak secrets into a tool's log buffer. The harness audit caught a longcat.chat key in the user's .env when running cleanup — fix: exclude `.env` from `diff`, `cat`, and any terminal scrollback before committing. Use `docs/config.example.env` (committed) vs `.env` (git-ignored) discipline strictly.
+- **Concurrency primitives belong in `core`, not in app code.** Adding `withFileLock` to `vault.mjs` early (v0.4) prevents an entire class of "two AI sessions corrupted the same file" bugs.
+- **LLM adapter interface must be in `core`.** Even before the first real LLM call ships, defining `LlmProvider` + `LocalEchoProvider` (deterministic stub) + `CachedProvider` + `RetryProvider` in `packages/core/src/llm/` means the rest of the app can build against the contract without waiting for OpenAI to be wired.

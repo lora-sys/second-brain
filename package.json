@@ -1,18 +1,19 @@
 {
   "name": "second-brain",
-  "version": "0.3.0",
+  "version": "0.4.0-alpha",
   "private": true,
   "type": "module",
-  "description": "Personal second-brain dashboard that writes to your Obsidian vault",
-  "keywords": ["obsidian", "markdown", "knowledge-base", "dashboard", "pkm", "second-brain"],
-  "license": "MIT",
-  "engines": {
-    "node": ">=20"
-  },
+  "description": "Personal Cognitive OS — local-first Obsidian-backed second brain with Tauri shell, AI daily memory, and MCP agent interface",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "node --watch server.mjs",
-    "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check lib/server.mjs && node --check lib/vault.mjs && node --check lib/frontmatter.mjs && node --check lib/linkfetch.mjs"
+    "dev:web": "node packages/web/src/server.mjs",
+    "build:web": "echo 'no build step yet'",
+    "dev:desktop": "cd packages/desktop && cargo tauri dev",
+    "build:desktop": "cd packages/desktop && cargo tauri build",
+    "check": "node --check packages/core/src/*.mjs && node --check packages/core/src/llm/*.js",
+    "test:e2e": "playwright-cli run-code --filename recordings/e2e-demo.mjs"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",

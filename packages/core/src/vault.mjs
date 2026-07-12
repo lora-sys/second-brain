@@ -95,7 +95,7 @@ export class Vault {
     };
   }
 
-  async write(type, slug, { data, body }) {
+  async write(type, slug, { data, body, locked = true }) {
     if (!slug) throw new Error('slug is required');
     const dir = this.dirFor(type);
     await fs.mkdir(dir, { recursive: true });
@@ -107,10 +107,24 @@ export class Vault {
       created: data?.created || stamp,
     };
     const filePath = this.pathFor(type, slug);
-    const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
     const text = stringify(merged, body ?? '');
-    await fs.writeFile(tmp, text, 'utf8');
-    await fs.rename(tmp, filePath);
+    if (!locked) {
+      // Fast path: atomic write without lock (use only for high-frequency writes
+      // where the caller is sure no concurrent writer is touching the same file)
+      const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+      await fs.writeFile(tmp, text, 'utf8');
+      await fs.rename(tmp, filePath);
+    } else {
+      // Safe path: lock then write
+      const release = await withFileLock(filePath, { timeout: 5000 });
+      try {
+        const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+        await fs.writeFile(tmp, text, 'utf8');
+        await fs.rename(tmp, filePath);
+      } finally {
+        await release();
+      }
+    }
     return {
       id: `${this.directories[type]}/${slug}`,
       type,
@@ -187,3 +201,86 @@ export class Vault {
 }
 
 export { TYPES };
+
+// ============================================================================
+// Concurrency: file lock for safe concurrent writes
+// ============================================================================
+// Uses lockfile-based mutex. Supports timeout.
+
+import { open as fsOpen } from 'node:fs/promises';
+
+/**
+ * Acquire a file lock for safe writes. The lock is released when the returned
+ * function is called (use try/finally). Throws on timeout.
+ *
+ * @param {string} filePath - absolute path of file to lock
+ * @param {object} opts
+ * @param {number} [opts.timeout=5000] - max ms to wait
+ * @param {string} [opts.tag='sb'] - lock owner tag (debug)
+ * @returns {Promise<() => Promise<void>>} - release function
+ */
+export async function withFileLock(filePath, opts = {}) {
+  const { timeout = 5000, tag = 'sb' } = opts;
+  const lockPath = `${filePath}.lock`;
+  const start = Date.now();
+  let acquired = false;
+  while (Date.now() - start < timeout) {
+    try {
+      // O_CREAT | O_EXCL: fails if file exists
+      const fh = await fsOpen(lockPath, 'wx');
+      await fh.writeFile(`${process.pid}:${tag}:${Date.now()}\n`, 'utf8');
+      await fh.close();
+      acquired = true;
+      break;
+    } catch (err) {
+      if (err.code === 'EEXIST') {
+        await new Promise((r) => setTimeout(r, 50 + Math.random() * 50));
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (!acquired) {
+    throw new Error(`Vault lock timeout for ${filePath} after ${timeout}ms`);
+  }
+  return async () => {
+    try {
+      const { unlink } = await import('node:fs/promises');
+      await unlink(lockPath);
+    } catch {
+      // Lock already gone — best effort
+    }
+  };
+}
+
+/**
+ * Read-modify-write a file under file lock. The callback receives the current
+ * file content (or null if it doesn't exist) and must return the new content.
+ *
+ * @param {string} filePath
+ * @param {function(string|null): Promise<string>} mutator
+ * @param {object} [opts]
+ * @returns {Promise<string>} - the new content written
+ */
+export async function withLockedMutation(filePath, mutator, opts = {}) {
+  const { timeout = 5000 } = opts;
+  let current = null;
+  try {
+    const { readFile } = await import('node:fs/promises');
+    current = await readFile(filePath, 'utf8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+  const newContent = await mutator(current);
+  const release = await withFileLock(filePath, { timeout });
+  try {
+    // Atomic write
+    const { writeFile, rename } = await import('node:fs/promises');
+    const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+    await writeFile(tmp, newContent, 'utf8');
+    await rename(tmp, filePath);
+  } finally {
+    await release();
+  }
+  return newContent;
+}
