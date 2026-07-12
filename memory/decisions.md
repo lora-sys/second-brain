@@ -29,3 +29,14 @@
 - **Cmd+K command palette**
 - **Drag-and-drop kanban**
 - **Three themes**: light / dark / sepia
+
+## 2026-07-12 (decisions ratified)
+
+- **Tauri strategy (ADR-0001)**: wrap existing web frontend, no rewrite
+- **LLM strategy (ADR-0002)**: OpenAI-compatible adapter primary, local-echo fallback, pluggable
+- **Repo strategy (ADR-0003)**: Monorepo with pnpm workspaces — `packages/{core, web, desktop, agent}`
+- **Data schema (ADR-0004)**: JSONL + SQLite FTS5 dual storage
+- **UI strategy (ADR-0005)**: Desktop = Productive Cockpit, Web = Landing Page (Image 1 style)
+- **Agent protocol (ADR-0006)**: Adopt MCP — Second Brain ships an MCP server so Claude Desktop / Codex CLI / Hermes can call us
+- **Capture layer**: 3 channels (file watcher, HTTP webhook, MCP tool) — to be designed in v0.5
+

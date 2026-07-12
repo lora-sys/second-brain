@@ -1,51 +1,73 @@
-# ADR-0002: LLM inference is local-only by default
+# ADR-0002: LLM inference — OpenAI-compatible adapter first, local optional
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-07-12
 - **Deciders**: @coordinator, @human
 - **Driver Issue**: v0.5 (TBD)
 
 ## Context
 
-The user's "second brain" content is private. Sending it to a remote API by default would violate the local-first promise. But local LLMs have smaller context, slower inference, and may miss cloud-only models.
+The user's "second brain" content is private but they primarily plan to use API-based LLMs (OpenAI / Anthropic-compatible) via `.env` keys. Local LLM is a nice-to-have. We need an adapter pattern that:
+- Works with OpenAI out of the box (via `.env`)
+- Is extensible to Anthropic, Ollama, llama.cpp, etc.
+- Doesn't leak content to a provider without explicit opt-in
+- Lets the user audit every prompt and response
 
 ## Decision
 
-**Default: local LLM only.** No API key, no cloud call, no telemetry.
+**Primary: an OpenAI-compatible adapter**, configurable via `.env` (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`).
 
-**Opt-in API support** for users who:
-- Have no GPU / can't run a local model
-- Want a specific model only available via API
-- Are OK sending their content to that provider
+**Pluggable:** `LLMProvider` trait so we can add Anthropic / Ollama / llama.cpp / vLLM / etc. later.
 
-Every API call is a separate opt-in per session, with a visible "your content was sent to <provider>" toast.
+**Every prompt and response is logged** to the vault under `00-AI/prompts/<date>/<id>.md` and `00-AI/responses/<date>/<id>.md` for audit.
+
+**The user explicitly opts in to a provider** per session via Settings (not per call) — the toast "你的内容已发到 <provider>" appears on first call.
+
+**A "local echo" stub provider** ships by default so the daily-journal feature works even without any API key. It produces a templated reflection (event grouping, no LLM-generated prose) — not a real LLM, but a useful fallback.
 
 ## Alternatives Considered
 
-- **API-only (OpenAI / Anthropic default)**: Faster to ship, but privacy-violating. Reject.
-- **Local-only hard (no API ever)**: Most private. But excludes users without local models. Punt — design for it but don't ship it.
-- **Both, with no UI clarity**: Confusing. Users won't know what's happening.
+- **Local-only hard (Ollama, no API)**: rejected — user explicitly wants API path with `.env`
+- **Cloud-only (OpenAI only)**: rejected — must be pluggable
+- **Local-only with API as opt-in, no .env convenience**: rejected — `.env` is the most ergonomic onboarding
 
 ## Consequences
 
 ### Positive
-- Privacy by default — vault content never leaves the machine without explicit action
-- No surprise costs
-- Works offline
-- Aligns with the product's core promise
+- Works out of the box with any OpenAI-compatible endpoint (OpenAI, Azure, Together, Groq, Ollama's OpenAI mode, vLLM, etc.)
+- `.env` is the standard config convention
+- Logged prompts = auditable AI behavior
+- Fallback local-echo means the app still works offline / without keys
 
 ### Negative
-- Smaller model context windows
-- Slower inference on consumer hardware
-- Need to maintain Ollama / llama.cpp adapter
+- Default onboarding sends content to a third party if user configures `.env` and forgets
+- OpenAI's API format adds an extra layer (chat completion, function calling) we have to wrap
 
 ### Mitigations
-- Adapter pattern: `LLMProvider` trait, multiple impls, future-proof
-- Cache prompt templates in vault for transparency
-- Surface "local model not detected" in onboarding with download link
+- Visible toast on first API call per session
+- "Provider" indicator always visible in the topbar
+- Settings UI shows the active model + last call timestamp
+- `.env.example` ships with helpful comments about what each key does
+- All prompts and responses are local files in the vault — the user owns the audit trail
+
+## Adapter interface (Rust)
+
+```rust
+#[async_trait]
+pub trait LlmProvider: Send + Sync {
+    async fn complete(&self, req: CompletionRequest) -> Result<CompletionResponse, LlmError>;
+    fn info(&self) -> ProviderInfo; // name, model, costs
+}
+
+pub struct ProviderInfo {
+    pub name: String,           // "openai", "anthropic", "ollama", "local-echo"
+    pub model: String,          // "gpt-4o-mini", etc.
+    pub is_local: bool,
+}
+```
 
 ## Follow-ups
 
-- v0.5.3: LLM adapter implementation
-- v0.5.16: prompts audit system
-
+- v0.5.3: OpenAI adapter + local-echo stub
+- v0.5.x: Anthropic, Ollama, llama.cpp adapters
+- v0.9: Agent Protocol (MCP server) so external AIs can call us back

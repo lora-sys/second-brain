@@ -65,9 +65,17 @@ _None._
 - **Known tech debt**: Node HTTP API duplicates what Tauri commands can do (will be deprecated in v0.4.3).
 - **Open design questions** (see `docs/decisions/`): 4 (listed in next section).
 
-## Critical Decisions Pending Human Input
+## Critical Decisions (4 ADRs accepted, 2 pending)
 
-1. **Tauri webview strategy** — Reuse existing `public/` as-is, or rewrite in a Tauri-native UI framework? → see ADR-0001 draft
-2. **Repo split** — Single repo with `src-tauri/` subdir, or separate `second-brain-web` and `second-brain-desktop` repos?
-3. **AI inference** — Local-only (Ollama / llama.cpp), API-only (OpenAI / Anthropic), or both with user choice?
-4. **v0.5 priority** — Event stream collector first, or daily journal generator first?
+### Accepted (Phase 0)
+1. ✅ **ADR-0001** Tauri wraps existing web frontend as-is (no rewrite)
+2. ✅ **ADR-0002** OpenAI-compatible adapter first, with local-echo fallback and local-LLM adapter later
+3. ✅ **ADR-0003** Monorepo workspace: `packages/{core, web, desktop, agent}`
+4. ✅ **ADR-0004** JSONL (human) + SQLite FTS5 (machine) dual storage
+5. ✅ **ADR-0005** Desktop = Productive Cockpit (Image 3); Web = Landing Page (Image 1)
+6. ✅ **ADR-0006** MCP server for external AI integration (Claude/Codex/Hermes)
+
+### Pending (need human input)
+- **Capture layer priority** — file watcher / HTTP webhook / CLI binary — all three? Order?
+- **Cockpit UI rebuild scope** — v0.4 ships current v0.3 UI first, or jump straight to cockpit?
+
