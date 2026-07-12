@@ -50,3 +50,11 @@
 - **.env.example shipped** — 52 lines of documented config (CRITICAL: never commit .env)
 - **Self-review caught real issues** — stale locks, atomic write, narrow barrel, etc. Follow-up issues #2, #3 filed
 - **Agent app audit** — 10 gaps identified in concurrency, conversation history, E2E AI testing, etc.
+
+## 2026-07-12 (v0.4.x WIP stabilized, cockpit skeleton + flat lib/ landed)
+
+- **Flat lib/ structure restored** (commit 43f4183) — v0.4.1's pnpm monorepo was reverted because the ceremony wasn't earning its keep yet. We have one app, one repo, one set of deps. LLM adapter interface (`LocalEchoProvider` / `CachedProvider` / `RetryProvider` / `createOpenAIProvider`) and `withFileLock` concurrency primitives survived the move intact.
+- **ADR-0003 status → Superseded** — to be formalized as ADR-0007 ("flat lib/ at root, monorepo deferred to v0.5+"). Trigger conditions for revisiting monorepo: (a) we add a second deployable (Tauri + something else), (b) we add the agent package with its own deps, or (c) we exceed 3 npm deps for the web SPA.
+- **Cockpit UI shipped as web overlay (commit ab79c3b)** — `?cockpit=1` toggles the cockpit shell which re-parents the existing `#main` element into a new sidebar+main layout. Console-clean, 6 screenshots captured. Self-review approved after one fix (vault name refresh).
+- **Cockpit re-parenting trick** — `adoptV3Elements()` moves `#main` from `.app` into the cockpit content area, letting `renderDashboard` / `renderTasks` / `renderLinks` write into the cockpit without modification. Documented coupling; will be replaced by `invoke()` in v0.4.5.
+- **Toolchain confirmed for Tauri 2.0** — cargo 1.97, rustc 1.97, cargo-tauri 2.11.4, webkit2gtk-4.1 2.52.5 are all installed. Can actually build Tauri in this env.
