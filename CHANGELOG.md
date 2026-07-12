@@ -15,7 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Theme system (custom palette + fonts)
 
 
+
+## [0.3.0] - 2026-07-12
+
+### Added
+- **Wikilink autocomplete** (v0.3 主菜) — 编辑器里输入 `[[` 触发浮层，模糊搜索所有实体（按 label / slug / type 匹配），方向键选择，回车或 Tab 插入 `[[type/slug|label]]`，Esc 关闭。打开编辑 modal 时自动预加载所有实体。
+- **Smart mentions** (v0.3 配菜) — 渲染 Markdown 时自动把认识的人名/标题转成 `.auto-mention` wikilink（虚线下划线区分于显式 wikilink 的实色胶囊）。词边界检测避免误匹配。
+- **任务卡片 inline 状态切换** (v0.3 小菜) — 看板卡片 hover 状态徽章变成可点击，点击弹 popover 选择 4 种状态，乐观更新 + API 同步 + 失败回滚。
+- **标签筛选 chips** (v0.3 甜点) — 列表页（人物/项目/链接）顶部 tag chip 多选，AND 逻辑，"清除"按钮一键还原。状态持久化在内存中。
+
+### Improved
+- 渲染 markdown 时多走一遍 `applySmartMentions` post-process（DOM walker，安全避开 `<a>/<code>/<pre>` 内部）
+- renderEntity 加载时也预加载 allEntities，确保详情页有 smart mention 数据
+
 ## [0.2.0] - 2026-07-11
+
 
 ### Added
 - **Design upgrade (v0.2 design language)**
@@ -75,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Link import requires server-side fetch (network access)
 - All multi-user concerns out of scope (single user only)
 
-[Unreleased]: https://github.com/lora-sys/second-brain/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/lora-sys/second-brain/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/lora-sys/second-brain/releases/tag/v0.3.0
 [0.2.0]: https://github.com/lora-sys/second-brain/releases/tag/v0.2.0
 [0.1.0]: https://github.com/lora-sys/second-brain/releases/tag/v0.1.0
