@@ -1830,6 +1830,71 @@
     });
   }
 
+  // ============================ Cockpit Bridge ========================
+  // v0.4.c1 — expose internal renderers so cockpit.js can reuse them
+  // and install a cockpit-aware boot when ?cockpit=1 is set.
+  window.__appState = state;
+  window.__renderDashboard = renderDashboard;
+  window.__renderTasks = renderTasks;
+  window.__renderPeople = renderPeople;
+  window.__renderProjects = renderProjects;
+  window.__renderLinks = renderLinks;
+  window.__refreshCounts = refreshCounts;
+  window.openQuickAdd = openQuickAdd;
+  window.openImportLinkModal = openImportLinkModal;
+  window.openCmdK = openCmdK;
+  window.__toggleTheme = () => {
+    const themes = ['light', 'dark', 'sepia'];
+    const next = themes[(themes.indexOf(state.theme) + 1) % themes.length];
+    state.theme = next;
+    applyTheme();
+    localStorage.setItem('sb-theme', state.theme);
+    toast(`主题：${next === 'light' ? '浅色' : next === 'dark' ? '深色' : '复古'}`, 'info');
+  };
+
+  // Cockpit entry point: when ?cockpit=1 is set, swap the standard layout
+  // for the cockpit shell and route via cockpit.renderContent().
+  async function cockpitRoute() {
+    if (!window.__cockpit) return handleRoute();
+    const hash = location.hash || '#/dashboard';
+    const route = hash.replace('#/', '').split('?')[0];
+    const impl = routeImplFor(route);
+    try {
+      await window.__refreshCounts();
+    } catch {}
+    await window.__cockpit.renderContent(impl, hash);
+  }
+
+  function routeImplFor(route) {
+    if (!route || route === 'dashboard' || route === '') return 'dashboard';
+    if (route === 'tasks') return 'tasks';
+    if (route === 'resources') return 'links';
+    if (route === 'links') return 'links';
+    if (route === 'people' || route === 'projects') return 'soon';
+    if (route === 'tags') return 'tags';
+    return 'soon';
+  }
+
+  window.__bootCockpit = async function bootCockpit() {
+    setupMarked();
+    setupSearch();
+    setupTheme();
+    setupCmdK();
+    if (window.__wikilinkAutocomplete) window.__wikilinkAutocomplete.init();
+    try {
+      state.config = await api.config.get();
+    } catch (err) {
+      toast('加载配置失败：' + err.message, 'error');
+    }
+    if (window.__cockpit) {
+      window.__cockpit.renderShell();
+      if (window.__cockpit.refreshVaultName) window.__cockpit.refreshVaultName();
+    }
+    window.removeEventListener('hashchange', handleRoute);
+    window.addEventListener('hashchange', cockpitRoute);
+    if (!location.hash) location.hash = '#/dashboard';
+    await cockpitRoute();
+  };
   // ============================ Bootstrap =============================
   async function boot() {
     setupMarked();
@@ -1848,5 +1913,5 @@
     await handleRoute();
   }
 
-  document.addEventListener('DOMContentLoaded', boot);
+  document.addEventListener("DOMContentLoaded", () => { if (window.__cockpitAutoBoot && window.__cockpitAutoBoot()) window.__bootCockpit(); else boot(); });
 })();

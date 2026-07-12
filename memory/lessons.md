@@ -32,3 +32,10 @@
 - **Never read a real .env into version control.** Even `diff`-ing a .env file can leak secrets into a tool's log buffer. The harness audit caught a longcat.chat key in the user's .env when running cleanup — fix: exclude `.env` from `diff`, `cat`, and any terminal scrollback before committing. Use `docs/config.example.env` (committed) vs `.env` (git-ignored) discipline strictly.
 - **Concurrency primitives belong in `core`, not in app code.** Adding `withFileLock` to `vault.mjs` early (v0.4) prevents an entire class of "two AI sessions corrupted the same file" bugs.
 - **LLM adapter interface must be in `core`.** Even before the first real LLM call ships, defining `LlmProvider` + `LocalEchoProvider` (deterministic stub) + `CachedProvider` + `RetryProvider` in `packages/core/src/llm/` means the rest of the app can build against the contract without waiting for OpenAI to be wired.
+
+## Cockpit (v0.4.c1)
+
+- **Re-parenting existing DOM is a valid integration trick** — when you want to overlay a new UI on an existing one without rewriting its render functions, moving the target elements into the new container is cheaper than threading a "renderTarget" parameter through every call site. The cost is DOM-shape coupling, which is acceptable when the underlying renderer isn't going to change soon.
+- **MutationObserver is the right tool for mirroring text updates between hidden and visible elements** — `$('#page-title').textContent = ...` from v0.3 stays working, and the cockpit's `#cockpit-title` stays in sync automatically. One observer per overlay instance is fine; just don't forget to disconnect if the overlay is torn down.
+- **Always capture async-loaded state AFTER it's loaded** — vault name was captured at renderShell() time, but config loads asynchronously. Either capture lazily (refresher function called from both renderShell and post-load) or wait. The refresher pattern is cleaner.
+- **Console-clean + 6 screenshots is a real Evidence pack** — for UI work, the gate is "does the page render without errors and do the key states look right". Don't gate on full E2E when visual inspection is enough.
