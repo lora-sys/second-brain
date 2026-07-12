@@ -40,3 +40,13 @@
 - **Agent protocol (ADR-0006)**: Adopt MCP — Second Brain ships an MCP server so Claude Desktop / Codex CLI / Hermes can call us
 - **Capture layer**: 3 channels (file watcher, HTTP webhook, MCP tool) — to be designed in v0.5
 
+
+## 2026-07-12 (v0.4.1 done, agent app readiness check)
+
+- **Monorepo bootstrap landed** — `lib/` → `packages/core/`, pnpm workspace, 4 LLM adapter files added
+- **Concurrency primitives added** — `withFileLock` + `withLockedMutation` in vault.mjs
+- **LLM adapter pattern established** — `LlmProvider` interface, `LocalEchoProvider` (deterministic stub), `CachedProvider`, `RetryProvider`, `createOpenAIProvider`
+- **AI audit log** — every tool call written to `00-AI/audit/YYYY-MM-DD/<ts>.md`
+- **.env.example shipped** — 52 lines of documented config (CRITICAL: never commit .env)
+- **Self-review caught real issues** — stale locks, atomic write, narrow barrel, etc. Follow-up issues #2, #3 filed
+- **Agent app audit** — 10 gaps identified in concurrency, conversation history, E2E AI testing, etc.
