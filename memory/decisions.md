@@ -66,3 +66,12 @@
 - **Security posture for v0.4.3** — no shell plugin, no fs plugin, no http plugin. Only `core:default` + explicit window perms. Documented in lib.rs top comment + capabilities/default.json.
 - **Known env limitation** — sandbox has no GPU, GDK falls back to software rendering for WebKit; screenshots from `PIL.ImageGrab` don't always show the webview content. Window chrome / native decorations do show in the screenshot, proving the shell works. Full UI verification waits for v0.4.7 on a real Linux machine.
 - **Scope discipline for v0.4.3** — the shell launches but does NOTHING yet (no vault commands). All vault ops still go through the Node HTTP server. The next issue (v0.4.4) ports at least `vault_list` + `config_get` to Rust commands so release builds actually work.
+
+## 2026-07-12 (v0.4.4 Tauri vault commands landed)
+
+- **Two Rust commands shipped** (commit 3611244) — `config_get()` and `vault_list_all()`. Minimum viable: just enough to bridge the bundled Tauri app to the vault without a Node sidecar.
+- **Decision: don't port every endpoint to Rust** — we picked the narrowest viable proof (2 commands, 8 tests, ~150 lines) over a full port. Other endpoints land as v0.4.4.x follow-ups.
+- **YAML reimplemented in Rust** — `serde_yaml` with lenient fallback (returns `{}` on parse error, never panics). Mirrors `lib/frontmatter.mjs`'s `parseYamlLenient`. Tests pin the contract.
+- **Config search order finalized** — `$SECOND_BRAIN_CONFIG` → cwd → `$XDG_CONFIG_HOME/second-brain/` → `~/.config/second-brain/`. The Tauri bundled app's first launch will likely fail to find a config; that's a UX problem for v0.4.7 (settings UI), not a v0.4.4 problem.
+- **`walkdir` with `max_depth(1)`** — entity directories are flat by convention (no nested folders of .md files). Attachment subdirectories are out of scope.
+- **Path canonicalization in `find_config`** — returned paths are absolute and stable. Tests that compare with `tempdir` paths now pass reliably.
