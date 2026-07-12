@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "v0.4.3 — minimal core capabilities. The webview can manage its own window (resize, close, focus, fullscreen toggle). No shell, no fs, no http — vault operations are gated through explicit Tauri commands added in v0.4.4.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-title"
+  ]
+}

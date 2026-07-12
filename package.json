@@ -3,12 +3,16 @@
   "version": "0.4.0-alpha",
   "private": true,
   "type": "module",
-  "description": "Personal Cognitive OS — local-first Obsidian-backed second brain with Tauri shell, AI daily memory, and MCP agent interface",
+  "description": "Personal Cognitive OS \u2014 local-first Obsidian-backed second brain with Tauri shell, AI daily memory, and MCP agent interface",
   "main": "server.mjs",
   "scripts": {
     "dev": "node server.mjs",
     "start": "node server.mjs",
+    "dev:tauri": "cargo tauri dev",
+    "build:tauri": "cargo tauri build",
+    "tauri": "cargo tauri",
     "check": "node --check server.mjs && node --check lib/*.mjs && node --check lib/llm/*.mjs",
+    "check:tauri": "cd src-tauri && cargo check",
     "test:e2e": "playwright-cli run-code --filename recordings/e2e-demo.mjs"
   },
   "dependencies": {
