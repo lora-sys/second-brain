@@ -129,7 +129,16 @@
     document.body.appendChild(overlay);
     adoptV3Elements(overlay);
     wireShell();
+    refreshVaultName();
     return true;
+  }
+
+  function refreshVaultName() {
+    const el = document.querySelector('.cockpit-vault-name');
+    if (!el) return;
+    const cfg = window.__appState && window.__appState.config;
+    const path = (cfg && cfg.vaultPath) || '';
+    el.textContent = path.split('/').filter(Boolean).pop() || '未配置';
   }
 
   function wireShell() {
@@ -200,7 +209,7 @@
     }
   }
 
-  window.__cockpit = { renderShell, renderContent, setActive, nav: { primary: NAV_PRIMARY, resources: NAV_RESOURCES } };
+  window.__cockpit = { renderShell, renderContent, setActive, refreshVaultName, nav: { primary: NAV_PRIMARY, resources: NAV_RESOURCES } };
   window.__cockpitAutoBoot = () => {
     try { return new URLSearchParams(location.search).get('cockpit') === '1'; }
     catch { return false; }

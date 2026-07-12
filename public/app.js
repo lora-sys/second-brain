@@ -1886,7 +1886,10 @@
     } catch (err) {
       toast('加载配置失败：' + err.message, 'error');
     }
-    if (window.__cockpit) window.__cockpit.renderShell();
+    if (window.__cockpit) {
+      window.__cockpit.renderShell();
+      if (window.__cockpit.refreshVaultName) window.__cockpit.refreshVaultName();
+    }
     window.removeEventListener('hashchange', handleRoute);
     window.addEventListener('hashchange', cockpitRoute);
     if (!location.hash) location.hash = '#/dashboard';
