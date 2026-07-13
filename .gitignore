@@ -31,3 +31,4 @@ content/
 *.env
 !docs/config.example.env
 .codegraph/
+squashfs-root/
