@@ -2136,3 +2136,25 @@ body.cockpit-mode .app { display: none !important; }
   .cockpit-today-wrap { grid-template-columns: 1fr; }
   .cockpit-rail { position: static; }
 }
+
+/* ============================================================================
+ * v0.4.c5 — Cockpit Bottom Row
+ * Three panels: 捕获的想法 / 收藏与书签 / 记忆回顾.
+ * Full-width grid below the main today + rail.
+ * ========================================================================== */
+
+.cockpit-bottom-row {
+  margin-top: 20px;
+}
+.cockpit-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.cockpit-bottom-grid .cockpit-today-block {
+  min-height: 0;
+}
+
+@media (max-width: 1100px) {
+  .cockpit-bottom-grid { grid-template-columns: 1fr; }
+}

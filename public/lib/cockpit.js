@@ -47,6 +47,9 @@
     bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
     clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
     calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y1="10"/>',
+    bookmark: '<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+    bulb: '<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3v1h6v-1c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"/>',
+    history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 3 3 8 8 8"/><path d="M12 7v5l4 2"/>',
   };
 
   // -------------------- Today helpers (v0.4.c3) --------------------
@@ -199,6 +202,88 @@
     ].join('');
   }
 
+    // -------------------- Bottom row helpers (v0.4.c5) --------------------
+  function captures(state) {
+    const all = [];
+    const e = state && state.entities;
+    if (!e) return all;
+    for (const type of ['person', 'task', 'project', 'link']) {
+      for (const item of (e[type] || [])) {
+        if (item.data && (item.data.captured === true || item.data.status === 'inbox')) {
+          all.push({ ...item, _type: type });
+        }
+      }
+    }
+    return all.slice(0, 6);
+  }
+  function bookmarks(state) {
+    const links = (state && state.entities && state.entities.link) || [];
+    return links.filter((l) => l.data && l.data.bookmark === true).slice(0, 6);
+  }
+  function recentActivity(state) {
+    const all = [];
+    const e = state && state.entities;
+    if (!e) return all;
+    for (const type of ['person', 'task', 'project', 'link']) {
+      for (const item of (e[type] || [])) {
+        all.push({ ...item, _type: type });
+      }
+    }
+    all.sort((a, b) => {
+      const ua = (a.data && a.data.updated) || '';
+      const ub = (b.data && b.data.updated) || '';
+      return ub.localeCompare(ua);
+    });
+    return all.slice(0, 6);
+  }
+  function renderBottomRow(state) {
+    const cap = captures(state);
+    const bk = bookmarks(state);
+    const rec = recentActivity(state);
+    const capHtml = cap.length
+      ? `<ul class="cockpit-list">${cap.map((t) => `<li><span class="cockpit-list-dot dot-${esc(t._type)}"></span><span class="cockpit-list-title">${esc(t.title || t.slug)}</span></li>`).join('')}</ul>`
+      : `<p class="cockpit-block-empty">还没有捕获的想法。试试 ⌘N（v0.5 上线）。</p>`;
+    const bkHtml = bk.length
+      ? `<ul class="cockpit-list">${bk.map((l) => {
+          const url = l.data && l.data.url;
+          return `<li><span class="cockpit-list-dot dot-link"></span><a class="cockpit-list-title" href="${esc(url || '#')}" target="_blank" rel="noopener">${esc(l.title || l.slug)}</a>${url ? `<span class="cockpit-list-meta">${esc((() => { try { return new URL(url).hostname.replace('www.', ''); } catch { return ''; } })())}</span>` : ''}</li>`;
+        }).join('')}</ul>`
+      : `<p class="cockpit-block-empty">还没有收藏的链接。编辑 link 时加 <code>bookmark: true</code>。</p>`;
+    const recHtml = rec.length
+      ? `<ul class="cockpit-list">${rec.map((t) => `<li><span class="cockpit-list-dot dot-${esc(t._type)}"></span><span class="cockpit-list-title">${esc(t.title || t.slug)}</span><span class="cockpit-list-meta">${esc((t.data && t.data.updated) || '').slice(0, 10)}</span></li>`).join('')}</ul>`
+      : `<p class="cockpit-block-empty">还没有任何 entry。</p>`;
+    return [
+      '<section class="cockpit-bottom-row">',
+        '<div class="cockpit-bottom-grid">',
+          '<article class="cockpit-today-block block-captures">',
+            '<header class="cockpit-block-header">',
+              '<span class="cockpit-block-icon">' + icon('bulb', 14) + '</span>',
+              '<h2 class="cockpit-block-title">捕获的想法</h2>',
+              '<span class="cockpit-block-count">' + cap.length + '</span>',
+            '</header>',
+            '<div class="cockpit-block-body">' + capHtml + '</div>',
+          '</article>',
+          '<article class="cockpit-today-block block-bookmarks">',
+            '<header class="cockpit-block-header">',
+              '<span class="cockpit-block-icon">' + icon('bookmark', 14) + '</span>',
+              '<h2 class="cockpit-block-title">收藏与书签</h2>',
+              '<span class="cockpit-block-count">' + bk.length + '</span>',
+            '</header>',
+            '<div class="cockpit-block-body">' + bkHtml + '</div>',
+          '</article>',
+          '<article class="cockpit-today-block block-recent">',
+            '<header class="cockpit-block-header">',
+              '<span class="cockpit-block-icon">' + icon('history', 14) + '</span>',
+              '<h2 class="cockpit-block-title">记忆回顾</h2>',
+              '<span class="cockpit-block-count">' + rec.length + '</span>',
+            '</header>',
+            '<div class="cockpit-block-body">' + recHtml + '</div>',
+          '</article>',
+        '</div>',
+      '</section>'
+    ].join('');
+  }
+
     function renderTodayPanel() {
     const state = (window.__appState) || { entities: { person: [], task: [], project: [], link: [] } };
     const reflection = pickReflection(state);
@@ -259,6 +344,7 @@
           '</div>',
           renderRightRail(state),
         '</div>',
+        renderBottomRow(state),
       '</div>'
     ].join('');
   }
