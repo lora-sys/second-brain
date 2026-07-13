@@ -41,7 +41,122 @@
     plus: '<path d="M12 5v14M5 12h14"/>',
     link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
     archive: '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y1="12"/>',
+    star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+    trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 4h2a2 2 0 0 1 2 2v1a4 4 0 0 1-4 4M7 4H5a2 2 0 0 0-2 2v1a4 4 0 0 0 4 4"/>',
+    target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   };
+
+  // -------------------- Today helpers (v0.4.c3) --------------------
+  function todayISO() {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  }
+  function isSameDay(iso, dayISO) {
+    if (!iso) return false;
+    return String(iso).slice(0, 10) === dayISO;
+  }
+  function escapeAttr(s) {
+    return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+  }
+  function pickReflection(state) {
+    // "今天想到" — a non-task entity. Prefer recent person / project / link.
+    const candidates = [];
+    const e = state && state.entities;
+    if (e) {
+      for (const k of ['person', 'project', 'link']) {
+        for (const item of (e[k] || [])) candidates.push({ ...item, _type: k });
+      }
+    }
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => {
+      const ua = (a.updated || a.data?.updated || '').toString();
+      const ub = (b.updated || b.data?.updated || '').toString();
+      return ub.localeCompare(ua);
+    });
+    return candidates[0];
+  }
+  function todayWins(state) {
+    const day = todayISO();
+    const tasks = (state && state.entities && state.entities.task) || [];
+    return tasks
+      .filter((t) => {
+        const data = t.data || {};
+        const isDone = (data.status === 'done') || (data.status === '已完成');
+        return isDone && (isSameDay(data.updated, day) || isSameDay(data.completed, day));
+      })
+      .slice(0, 5);
+  }
+  function todayFocus(state) {
+    const day = todayISO();
+    const tasks = (state && state.entities && state.entities.task) || [];
+    return tasks
+      .filter((t) => {
+        const data = t.data || {};
+        const status = data.status || 'open';
+        if (status === 'done' || status === '已完成' || status === 'cancelled' || status === '已取消') return false;
+        const due = (data.due || '').toString().slice(0, 10);
+        return due && due <= day; // due today or overdue
+      })
+      .slice(0, 5);
+  }
+  function renderTodayPanel() {
+    const state = (window.__appState) || { entities: { person: [], task: [], project: [], link: [] } };
+    const reflection = pickReflection(state);
+    const wins = todayWins(state);
+    const focus = todayFocus(state);
+    const today = new Date();
+    const dateStr = today.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+    const emoji = ['📓','🌱','✨','🔮','🪴'][today.getDate() % 5];
+    const reflectionHtml = reflection
+      ? `<div class="cockpit-reflection">
+           <div class="cockpit-reflection-kind">${esc(reflection._type || '')}</div>
+           <a class="cockpit-reflection-title" href="#/entity/${escapeAttr(reflection.id)}">${esc(reflection.title || reflection.slug)}</a>
+           <p class="cockpit-reflection-hint">${esc((reflection.body || '').slice(0, 80) || '无摘要')}</p>
+         </div>`
+      : `<p class="cockpit-block-empty">vault 还是空的。今天新建一个 entry 开始吧 →</p>`;
+    const winsHtml = wins.length
+      ? `<ul class="cockpit-list">${wins.map((t) => `<li><span class="cockpit-list-dot dot-task"></span><span class="cockpit-list-title">${esc(t.title || t.slug)}</span></li>`).join('')}</ul>`
+      : `<p class="cockpit-block-empty">今天还没有完成的 task。</p>`;
+    const focusHtml = focus.length
+      ? `<ul class="cockpit-list">${focus.map((t) => `<li><span class="cockpit-list-dot dot-task-overdue"></span><span class="cockpit-list-title">${esc(t.title || t.slug)}</span><span class="cockpit-list-meta">${esc((t.data && t.data.due) || '')}</span></li>`).join('')}</ul>`
+      : `<p class="cockpit-block-empty">今天没有到期的 task。Nice。</p>`;
+    return [
+      '<div class="cockpit-today">',
+        '<header class="cockpit-today-header">',
+          '<div class="cockpit-today-emoji">' + emoji + '</div>',
+          '<div>',
+            '<h1 class="cockpit-today-title">' + esc(dateStr) + '</h1>',
+            '<p class="cockpit-today-sub">今日的 「想到 / 成就 / 关注」</p>',
+          '</div>',
+        '</header>',
+        '<section class="cockpit-today-grid">',
+          '<article class="cockpit-today-block block-reflection">',
+            '<header class="cockpit-block-header">',
+              '<span class="cockpit-block-icon">' + icon('star', 14) + '</span>',
+              '<h2 class="cockpit-block-title">今日感悟</h2>',
+            '</header>',
+            '<div class="cockpit-block-body">' + reflectionHtml + '</div>',
+          '</article>',
+          '<article class="cockpit-today-block block-wins">',
+            '<header class="cockpit-block-header">',
+              '<span class="cockpit-block-icon">' + icon('trophy', 14) + '</span>',
+              '<h2 class="cockpit-block-title">今日成就</h2>',
+              '<span class="cockpit-block-count">' + wins.length + '</span>',
+            '</header>',
+            '<div class="cockpit-block-body">' + winsHtml + '</div>',
+          '</article>',
+          '<article class="cockpit-today-block block-focus">',
+            '<header class="cockpit-block-header">',
+              '<span class="cockpit-block-icon">' + icon('target', 14) + '</span>',
+              '<h2 class="cockpit-block-title">今日关注</h2>',
+              '<span class="cockpit-block-count">' + focus.length + '</span>',
+            '</header>',
+            '<div class="cockpit-block-body">' + focusHtml + '</div>',
+          '</article>',
+        '</section>',
+      '</div>'
+    ].join('');
+  }
 
   function icon(name, size) {
     size = size || 16;
@@ -184,7 +299,7 @@
     setActive(hash || location.hash || '#/dashboard');
     try {
       if (route === 'dashboard' || route === '' || !route) {
-        if (window.__renderDashboard) await window.__renderDashboard();
+        content.innerHTML = renderTodayPanel();
         return;
       }
       if (route === 'tasks') { if (window.__renderTasks) await window.__renderTasks(); return; }
