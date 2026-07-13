@@ -146,3 +146,11 @@
 - **No data-field search** — doesn't match against tags, status, priority, due. Filed as polish with field-prefix syntax (`tags:urgent`).
 - **No pagination** — returns all matches, lets UI paginate. Filed as polish with top-N + total count.
 - **Tauri desktop app is now feature-complete for v0.4 CRUD+search scope** — 7 commands: config_get, vault_list_all, vault_read, vault_create, vault_update, vault_delete, vault_search. Every entity operation available in browser is also available in Tauri mode.
+
+## 2026-07-13 (v0.4.c5 cockpit bottom row landed)
+
+- **Cockpit today page now has 8 panels** — 3 main grid (感悟/成就/关注), 2 right rail (任务与提醒/即将到来), 3 bottom row (捕获的想法/收藏与书签/记忆回顾). The cockpit is starting to feel like a real product surface, not a placeholder.
+- **Bookmarks = filter on existing link entities, not a new data model** — `bookmark: true` frontmatter flag is enough. No new entity type, no new CRUD, no new Tauri command. The vault already has link entities; the cockpit just surfaces a subset differently.
+- **Captures: forward-compatible empty state** — the panel layout + data hook (`data.captured === true`) is in v0.4.c5. The actual capture flow (⌘N keyboard, mobile share, etc.) lands in v0.5. The empty state tells the user to expect it.
+- **Memory recall = 6 most recently updated entities across all types** — type-agnostic, fits in one panel, sorts by `data.updated` desc. Filed polish: real "memory recall" would consider capture-order + read-frequency, not just recency.
+- **Cockpit is becoming a "daily use" surface, not a placeholder** — 8 panels is a lot. v0.4.6 should split cockpit.js into modules before it grows further.

@@ -111,3 +111,11 @@
 - **Empty query vs no results are different semantically** — empty query is a programmer error (or UI bug), no results is a normal outcome. Returning an error for one and an empty Vec for the other lets the UI show different messages ("type something" vs "no matches") without string-matching error messages.
 - **Reuse `vault_list_all` for search** — even though it's O(N), the same walk already produces the data. Adding a separate walk for search would be a maintenance burden. The optimization (indexed search) is a v0.4.4.x++++ polish.
 - **Frontmatter data fields are not searched by default** — that's the right call for v0.4.4.x+++. Users searching for "urgent" expect to find tasks they titled "Urgent task", not tasks tagged urgent. Data fields are structured (status:done, priority:high) and would need a different query syntax (`status:done`) to search semantically. Filed for v0.4.4.x++++.
+
+## v0.4.c5 (cockpit bottom row)
+
+- **"Data hook" panels** — for features that don't exist yet (captures), ship the panel + data hook + empty state. When the feature lands, the panel lights up automatically with no cockpit.js change. Cheaper than a placeholder; better UX than "coming soon".
+- **Bookmark = filter, not a new type** — adding a frontmatter flag is much cheaper than adding a new entity type, new CRUD, new Tauri command. The user gets the feature; the codebase stays simple. Reserve new types for genuinely new data shapes.
+- **URL parsing in JS is unforgiving** — `new URL(str)` throws on malformed strings. Always wrap in try/catch when the string is user-derived (bookmark URLs especially). The fix is one line; the bug without it is "page doesn't load because cockpit crashed".
+- **Standard mode regression is mandatory** — every time we add to cockpit, the standard v0.3 SPA might break. 30 seconds of test prevents an embarrassing "v0.3 broke" PR.
+- **8 panels is a lot** — at some point the cockpit becomes overwhelming. v0.4.6 polish: introduce panel collapse, or split the day into "focus" (今日 only) vs "review" (all panels).
