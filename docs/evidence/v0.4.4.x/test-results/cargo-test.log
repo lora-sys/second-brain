@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.48s
+     Running unittests src/lib.rs (target/debug/deps/second_brain_lib-6ce9ac6c1b770d3e)
+
+running 14 tests
+test tests::parse_frontmatter_missing_returns_body ... ok
+test tests::config_get_missing_returns_error ... ok
+test tests::find_config_via_env ... ok
+test tests::config_get_reads_minimal_config ... ok
+test tests::parse_frontmatter_broken_yaml_salvages ... ok
+test tests::parse_frontmatter_unclosed_returns_body ... ok
+test tests::parse_frontmatter_basic ... ok
+test tests::parse_id_rejects_empty ... ok
+test tests::parse_id_with_nested_path ... ok
+test tests::parse_id_basic ... ok
+test tests::vault_read_invalid_id_returns_error ... ok
+test tests::vault_read_missing_entity_returns_error ... ok
+test tests::vault_read_returns_entity ... ok
+test tests::vault_list_all_reads_fixture_vault ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
