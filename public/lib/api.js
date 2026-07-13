@@ -97,7 +97,16 @@
     },
     search: (q) => invokeOrFetch('vault_search', { query: q, type_filter: null }, `/api/search?q=${encodeURIComponent(q)}`),
     dashboard: () => api.get('/api/dashboard'),
-    importLink: (body) => api.post('/api/links/import', body),
+    importLink: (body) => {
+      if (tauri) {
+        return invokeOrFetch('vault_link_import', {
+          url: body && body.url,
+          title_hint: body && (body.title || body.titleHint),
+          tags: body && body.tags,
+        }, '/api/links/import', { method: 'POST', body: JSON.stringify(body || {}) });
+      }
+      return api.post('/api/links/import', body);
+    },
   };
 
 
