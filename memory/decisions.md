@@ -99,3 +99,12 @@
 - **Priority badge** — `高` (red pill) / `低` (gray pill) / null. Hard-coded map for now.
 - **Tasks pre-loaded via api.list()** in bootCockpit (c3 work) feeds the rail. Without that, the rail would be empty.
 - **TZ bug noted** — `js-yaml` parses `due: 2026-07-12` as UTC midnight Date. In TZ east of UTC, this becomes the previous day local. Tasks due "today" appear as "yesterday" locally. Filed as v0.4.c4 polish (strip time component when comparing).
+
+## 2026-07-13 (v0.4.4.x vault_read landed)
+
+- **vault_read Rust command shipped** (commit pending merge) — third Tauri command. With this, Tauri release app can read any entity by id.
+- **id format = `{directory}/{slug}`** — kept directory name (not entity type) so the id is self-describing (file path is implied). Type comes from inverting cfg.directories. Filed v0.4.4.x polish: assert resolved path is under vault_root.
+- **Frontend rewire: api.read → invokeOrFetch** — 3rd api method using the bridge. Tauri mode: vault_read, browser mode: fetch. Working end-to-end (Tauri-sim test confirms).
+- **Pre-existing parallel-test race fixed** — old chdir-based tests failed intermittently under parallel `cargo test`. Converted to SECOND_BRAIN_CONFIG env var pattern.
+- **parse_id first attempt was wrong** — hard-coded type check against person/task/project/link, but id is `{dir}/{slug}` not `{type}/{slug}`. Fixed by removing the check from parse_id and doing it via cfg inversion in vault_read.
+- **14/14 tests pass** (5 new for vault_read and parse_id, 9 pre-existing still passing).

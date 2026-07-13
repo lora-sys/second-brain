@@ -134,6 +134,65 @@ fn config_get() -> Result<Config, String> {
 }
 
 #[tauri::command]
+fn vault_read(id: String) -> Result<Entity, String> {
+    // id is "type/slug" form (matches the Entity.id we return from
+    // vault_list_all). Parse it, then read the entity from the vault.
+    let (dir_name, slug) = parse_id(&id)?;
+    let cfg = config_get().map_err(|e| format!("config: {e}"))?;
+    // Resolve directory → entity type by inverting cfg.directories.
+    // (dir_name is the directory, e.g. "10-People".)
+    let entity_type = cfg
+        .directories
+        .iter()
+        .find(|(_, v)| v.as_str() == dir_name.as_str())
+        .map(|(k, _)| k.clone());
+    let type_ = match entity_type {
+        Some(t) => t,
+        None => return Err(format!("unknown directory: {dir_name}")),
+    };
+    let vault_root = std::path::PathBuf::from(&cfg.vault_path);
+    let dir = vault_root.join(&dir_name);
+    if !dir.exists() {
+        return Err(format!("vault dir not found: {}", dir.display()));
+    }
+    let file_path = dir.join(format!("{slug}.md"));
+    if !file_path.exists() {
+        return Err(format!("entity not found: {id}"));
+    }
+    let raw = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("read {}: {}", file_path.display(), e))?;
+    let (data, body) = parse_frontmatter(&raw);
+    let title = data
+        .get("title")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| slug.clone());
+    Ok(Entity {
+        id: format!("{dir_name}/{slug}"),
+        r#type: type_,
+        slug,
+        title,
+        data,
+        body,
+        path: file_path.display().to_string(),
+    })
+}
+
+fn parse_id(id: &str) -> Result<(String, String), String> {
+    // id is "{directory}/{slug}" form (e.g. "10-People/alice"). We split on
+    // the LAST '/' so that nested directory structures (future-proof) work.
+    // The directory name is resolved against cfg.directories inside the
+    // command, so we don't validate the directory string here.
+    let idx = id.rfind('/').ok_or_else(|| format!("invalid id: {id}"))?;
+    let dir = id[..idx].to_string();
+    let slug = id[idx + 1..].to_string();
+    if dir.is_empty() || slug.is_empty() {
+        return Err(format!("invalid id: {id}"));
+    }
+    Ok((dir, slug))
+}
+
+#[tauri::command]
 fn vault_list_all() -> Result<Vec<Entity>, String> {
     let cfg = config_get().map_err(|e| format!("config: {e}"))?;
     let root = PathBuf::from(&cfg.vault_path);
@@ -214,7 +273,7 @@ pub fn run() {
             log::info!("second-brain v{} starting", env!("CARGO_PKG_VERSION"));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![config_get, vault_list_all])
+        .invoke_handler(tauri::generate_handler![config_get, vault_list_all, vault_read])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -267,16 +326,18 @@ mod tests {
     }
 
     #[test]
-    fn find_config_cwd() {
+    fn find_config_via_env() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let p = dir.path().join("config.json");
-        let mut f = std::fs::File::create(&p).expect("create");
-        f.write_all(b"{}").expect("write");
-        let prev = std::env::current_dir().expect("cwd");
-        std::env::set_current_dir(dir.path()).expect("chdir");
+        let cfg_path = dir.path().join("config.json");
+        std::fs::File::create(&cfg_path).expect("create").write_all(b"{}").expect("write");
+        let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
+        std::env::set_var("SECOND_BRAIN_CONFIG", &cfg_path);
         let found = find_config();
-        std::env::set_current_dir(prev).expect("restore cwd");
-        assert_eq!(found, Some(p));
+        match prev_env {
+            Some(v) => std::env::set_var("SECOND_BRAIN_CONFIG", v),
+            None => std::env::remove_var("SECOND_BRAIN_CONFIG"),
+        }
+        assert!(found.is_some(), "find_config should return Some");
     }
 
     #[test]
@@ -315,10 +376,15 @@ mod tests {
         );
         std::fs::write(&cfg_path, cfg_json).unwrap();
 
-        let prev = std::env::current_dir().expect("cwd");
-        std::env::set_current_dir(dir.path()).expect("chdir");
+        let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
+        std::env::set_var("SECOND_BRAIN_CONFIG", &cfg_path);
+
         let result = vault_list_all();
-        std::env::set_current_dir(prev).expect("restore cwd");
+        match prev_env {
+            Some(v) => std::env::set_var("SECOND_BRAIN_CONFIG", v),
+            None => std::env::remove_var("SECOND_BRAIN_CONFIG"),
+        }
+
 
         let entities = result.expect("vault_list_all ok");
         assert_eq!(entities.len(), 3, "expected 3 entities, got {entities:?}");
@@ -338,10 +404,15 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let cfg_path = dir.path().join("config.json");
         std::fs::write(&cfg_path, r#"{"vaultPath":"/tmp/fake"}"#).unwrap();
-        let prev = std::env::current_dir().expect("cwd");
-        std::env::set_current_dir(dir.path()).expect("chdir");
+        let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
+        std::env::set_var("SECOND_BRAIN_CONFIG", &cfg_path);
+
         let result = config_get();
-        std::env::set_current_dir(prev).expect("restore cwd");
+        match prev_env {
+            Some(v) => std::env::set_var("SECOND_BRAIN_CONFIG", v),
+            None => std::env::remove_var("SECOND_BRAIN_CONFIG"),
+        }
+
         let cfg = result.expect("config_get ok");
         assert_eq!(cfg.vault_path, "/tmp/fake");
         assert!(cfg.port.is_none());
@@ -350,12 +421,102 @@ mod tests {
     }
 
     #[test]
+    fn parse_id_basic() {
+        let (t, s) = parse_id("10-People/alice").unwrap();
+        assert_eq!(t, "10-People");
+        assert_eq!(s, "alice");
+    }
+
+    #[test]
+    fn parse_id_with_nested_path() {
+        // rfind splits on last '/', so type can contain '/' (future-proof).
+        let (t, s) = parse_id("a/b/c/alice").unwrap();
+        assert_eq!(t, "a/b/c");
+        assert_eq!(s, "alice");
+    }
+
+    #[test]
+    fn parse_id_rejects_empty() {
+        assert!(parse_id("/alice").is_err());
+        assert!(parse_id("10-People/").is_err());
+        assert!(parse_id("").is_err());
+    }
+
+    #[test]
+    fn vault_read_returns_entity() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        let people = vault.join("10-People");
+        std::fs::create_dir_all(&people).unwrap();
+        std::fs::write(
+            people.join("alice.md"),
+            "---\ntitle: Alice\ntype: person\nupdated: 2026-07-12T10:00:00Z\n---\nAlice body.\n",
+        ).unwrap();
+
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
+        std::env::set_var("SECOND_BRAIN_CONFIG", &cfg_path);
+        let result = vault_read("10-People/alice".to_string());
+        match prev_env {
+            Some(v) => std::env::set_var("SECOND_BRAIN_CONFIG", v),
+            None => std::env::remove_var("SECOND_BRAIN_CONFIG"),
+        }
+        let entity = result.expect("vault_read ok");
+        assert_eq!(entity.title, "Alice");
+        assert_eq!(entity.slug, "alice");
+        assert_eq!(entity.r#type, "person");
+        assert_eq!(entity.id, "10-People/alice");
+        assert!(entity.body.contains("Alice body"));
+        assert!(entity.data.get("title").is_some());
+    }
+
+    #[test]
+    fn vault_read_missing_entity_returns_error() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
+        std::env::set_var("SECOND_BRAIN_CONFIG", &cfg_path);
+        let result = vault_read("10-People/nonexistent".to_string());
+        match prev_env {
+            Some(v) => std::env::set_var("SECOND_BRAIN_CONFIG", v),
+            None => std::env::remove_var("SECOND_BRAIN_CONFIG"),
+        }
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("not found"), "got: {err}");
+    }
+
+    #[test]
+    fn vault_read_invalid_id_returns_error() {
+        // Empty id, no slash, unknown type.
+        assert!(vault_read("".to_string()).is_err());
+        assert!(vault_read("noslash".to_string()).is_err());
+        assert!(vault_read("99-X/y".to_string()).is_err());
+    }
+
+    #[test]
     fn config_get_missing_returns_error() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let prev = std::env::current_dir().expect("cwd");
-        std::env::set_current_dir(dir.path()).expect("chdir");
+        // Point SECOND_BRAIN_CONFIG at a path that does NOT exist.
+        let nonexistent = dir.path().join("does-not-exist.json");
+        let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
+        std::env::set_var("SECOND_BRAIN_CONFIG", &nonexistent);
         let result = config_get();
-        std::env::set_current_dir(prev).expect("restore cwd");
+        match prev_env {
+            Some(v) => std::env::set_var("SECOND_BRAIN_CONFIG", v),
+            None => std::env::remove_var("SECOND_BRAIN_CONFIG"),
+        }
+
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.contains("config.json not found"), "got: {err}");

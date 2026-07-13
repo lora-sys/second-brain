@@ -105,7 +105,7 @@
       }
       return api.get(type ? `/api/entities?type=${type}` : '/api/entities').then(d => d.items);
     },
-    read: (id) => api.get(`/api/entities/${encodeURIComponent(id)}`),
+    read: (id) => invokeOrFetch('vault_read', { id }, `/api/entities/${encodeURIComponent(id)}`),
     create: (body) => api.post('/api/entities', body),
     update: (id, body) => api.put(`/api/entities/${encodeURIComponent(id)}`, body),
     delete: (id) => api.del(`/api/entities/${encodeURIComponent(id)}`),
