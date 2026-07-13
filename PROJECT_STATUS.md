@@ -25,6 +25,7 @@ _Last updated: 2026-07-12 by @coordinator_
 | #v0.4.5 | Frontend rewire (config_get + vault_list_all → invoke) | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.6 | Tauri build pipeline + GitHub Actions + AppImage | Tauri | @coordinator | (next round) | Planning |
 | #v0.4.c3 | Cockpit today panel (感悟/成就/关注) | Cockpit UI | @coordinator | merged | ✅ Done |
+| #v0.4.c4 | Cockpit right rail (任务与提醒 + 即将到来) | Cockpit UI | @coordinator | merged | ✅ Done |
 
 ## Backlog (v0.4, in dependency order)
 
