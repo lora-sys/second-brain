@@ -36,7 +36,8 @@ _Last updated: 2026-07-12 by @coordinator_
 | #v0.4.c4 | Cockpit right rail (任务与提醒 + 即将到来) | Cockpit UI | @coordinator | merged | ✅ Done |
 | #v0.4.c5 | Cockpit bottom row (捕获/收藏/记忆回顾) | Cockpit UI | @coordinator | merged | ✅ Done |
 | #v0.4.c6.schedule | Cockpit 日程 section (timeline) | Cockpit UI | @coordinator | merged | ✅ Done |
-| #v0.4.c6.* | 其他 4 个 placeholder section (知识图谱/回顾/模板/智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |
+| #v0.4.c6.* | 其他 3 个 placeholder section (知识图谱/模板/智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |
+| #v0.4.7 | Real-device E2E tests + 2 critical bug fixes | Test | @coordinator | merged | ✅ Done |
 | #v0.4.L1 | Landing page (Track 4) | Web | @coordinator | merged | ✅ Done |
 | #v0.4.L2 | GitHub Pages deploy + OpenGraph + custom domain | Web | @coordinator | (follow-up) | Backlog |
 
@@ -51,7 +52,10 @@ _Last updated: 2026-07-12 by @coordinator_
 | v0.4.4 | tauri-commands | Port Node HTTP endpoints to Rust Tauri commands | L | A |
 | v0.4.5 | tauri-rewire-frontend | Replace `fetch('/api/...')` with `invoke('cmd_name')` | M | F |
 | v0.4.6 | tauri-build-pipeline | AppImage + .deb build, GitHub Actions, release pipeline | M | A |
-| v0.4.7 | tauri-evidence | Run full E2E against Tauri build, capture screenshots | M | QA |
+| v0.4.7 | tauri-evidence | Real-device E2E tests + 2 critical bug fixes (renderContent wipes adopted <main>; 回顾 soon badge) | M | QA | ✅
+| v0.4.7.x | tauri-evidence-on-hw | Run Tauri build against real desktop hardware (sandbox GPU limits) | M | QA |
+| v0.4.7.y | tauri-mobile-e2e | Mobile viewport E2E tests | S | QA |
+| v0.4.7.z | tauri-interaction-e2e | Interaction tests (click → navigate, form submit → API) | M | QA |
 | v0.4.5.1 | cockpit-a11y | Keyboard-navigable nav (follow-up from v0.4.c1 review) | S | F |
 | v0.4.5.2 | boot-shared-init | Extract setupX calls shared by boot() and __bootCockpit() | S | R |
 | v0.4.5.3 | cockpit-mobile-pass | <720px layout polish (follow-up from v0.4.c1 review) | S | F |
@@ -93,6 +97,7 @@ _None._
 
 | PR | Title | Evidence |
 |---|---|---|
+| `c148568` | merge: feature/v0.4.7-real-device-e2e (real-device E2E + 2 bug fixes) | [docs/evidence/v0.4.7-real-device/](evidence/v0.4.7-real-device/) |
 | `538b6d4` | docs: memory updates for v0.4.c3 | (in v0.4.c3 evidence) |
 | `4cf242a` | docs: memory updates for v0.4.5 | (in v0.4.5 evidence) |
 | (pending) | feat(bridge): v0.4.5 frontend rewire | [docs/evidence/v0.4.5/](evidence/v0.4.5/) |
