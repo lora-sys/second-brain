@@ -255,3 +255,13 @@
 - **Tauri binary runs but can't render in this dev env** — known GPU sandbox limitation. PID alive after 4s, no crashes. Real-device UI verification waits for v0.4.7.x on actual hardware.
 - **.deb package verified** — 11MB binary + icons + .desktop file. control field correct (depends on libwebkit2gtk-4.1-0, libgtk-3-0).
 - **88 commits on main** — project is feature-complete for v0.4 + 1 bug-fix round.
+
+## 2026-07-13 (v0.4.c6.知识图谱 knowledge graph landed)
+
+- **Knowledge graph view shipped** — 5th placeholder out of 6 done. 3 left: 模板, 智能体, ...
+- **Two connection signals, not one** — wikilinks alone would be too sparse (16 edges in the seed vault). Tag overlap adds implicit relationships. Together they produce a useful preview.
+- **Pure client-side** — no new Tauri command, no new API endpoint. Reads from `window.__state.state.entities`, computes the graph in <1ms.
+- **23/23 E2E tests pass** — 5 new tests cover knowledge page (renders, hero counts, 4 clusters, has hubs, no SOON badge).
+- **Seed data touched** — added 16 wikilinks across 5 entities to make the graph meaningful. This is a local-only seed change (Obsidian Vault), not committed.
+- **No canvas, no force-directed graph** — kept it as a text-list of hubs + edges. v0.6 will add the canvas.
+- **90 commits on main** — ahead of origin by 90.
