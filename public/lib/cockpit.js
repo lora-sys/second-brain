@@ -17,7 +17,7 @@
 
   const NAV_PRIMARY = [
     { hash: '#/dashboard', label: '今日', icon: 'home', impl: 'dashboard' },
-    { hash: '#/notes', label: '笔记库', icon: 'note', impl: 'soon' },
+    { hash: '#/notes', label: '笔记库', icon: 'note', impl: 'notes' },
     { hash: '#/knowledge', label: '知识图谱', icon: 'graph', impl: 'soon' },
     { hash: '#/tasks', label: '任务', icon: 'check', impl: 'tasks' },
     { hash: '#/schedule', label: '日程', icon: 'calendar', impl: 'schedule' },
@@ -389,6 +389,74 @@
     ].join('');
   }
 
+    // -------------------- Notes section (v0.4.c6) --------------------
+  function renderNotes(state) {
+    const e = state && state.entities;
+    const groups = [
+      { type: 'person', label: '人物', count: (e && e.person && e.person.length) || 0 },
+      { type: 'task', label: '任务', count: (e && e.task && e.task.length) || 0 },
+      { type: 'project', label: '项目', count: (e && e.project && e.project.length) || 0 },
+      { type: 'link', label: '链接', count: (e && e.link && e.link.length) || 0 },
+    ];
+    const totalCount = groups.reduce((s, g) => s + g.count, 0);
+    if (totalCount === 0) {
+      return [
+        '<div class="cockpit-notes">',
+          '<div class="cockpit-notes-empty">',
+            icon('note', 28),
+            '<h2>笔记库是空的</h2>',
+            '<p>新建一个 entry 开始吧。</p>',
+          '</div>',
+        '</div>'
+      ].join('');
+    }
+    const typeLabels = { person: '人物', task: '任务', project: '项目', link: '链接' };
+    const sectionHtml = groups.filter(g => g.count > 0).map(g => {
+      const items = (e[g.type] || []).slice().sort((a, b) => {
+        const ua = (a.data && a.data.updated) || '';
+        const ub = (b.data && b.data.updated) || '';
+        return ub.localeCompare(ua);
+      });
+      const itemsHtml = items.map(item => {
+        const title = item.title || item.slug;
+        const type = item.type;
+        const tags = (item.data && item.data.tags) || [];
+        const tagHtml = tags.length
+          ? '<span class="cockpit-notes-tags">' + tags.slice(0, 3).map(t => '<span class="cockpit-tag">' + esc(t) + '</span>').join('') + '</span>'
+          : '';
+        return [
+          '<a class="cockpit-notes-item" href="#/entity/' + esc(item.id) + '">',
+            '<span class="cockpit-list-dot dot-' + esc(type) + '"></span>',
+            '<span class="cockpit-notes-title">' + esc(title) + '</span>',
+            tagHtml,
+            '<span class="cockpit-list-meta">' + esc(((item.data && item.data.updated) || '').slice(0, 10)) + '</span>',
+          '</a>'
+        ].join('');
+      }).join('');
+      return [
+        '<section class="cockpit-notes-section type-' + esc(g.type) + '">',
+          '<header class="cockpit-notes-header">',
+            '<h2 class="cockpit-notes-title">' + esc(g.label) + '</h2>',
+            '<span class="cockpit-notes-count">' + g.count + '</span>',
+          '</header>',
+          '<div class="cockpit-notes-list">' + itemsHtml + '</div>',
+        '</section>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="cockpit-notes">',
+        '<header class="cockpit-notes-hero">',
+          icon('note', 24),
+          '<div>',
+            '<h1>笔记库</h1>',
+            '<p>' + totalCount + ' 个 entry，按类型分组。最近修改的排前面。</p>',
+          '</div>',
+        '</header>',
+        sectionHtml,
+      '</div>'
+    ].join('');
+  }
+
     function renderTodayPanel() {
     const state = (window.__appState) || { entities: { person: [], task: [], project: [], link: [] } };
     const reflection = pickReflection(state);
@@ -602,6 +670,10 @@
       if (route === 'links') { if (window.__renderLinks) await window.__renderLinks(); return; }
       if (route === 'schedule') {
         content.innerHTML = renderSchedule(state);
+        return;
+      }
+      if (route === 'notes') {
+        content.innerHTML = renderNotes(state);
         return;
       }
       if (route === 'tags') {
