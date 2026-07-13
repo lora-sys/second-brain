@@ -126,3 +126,11 @@
 - **Patch semantics via Option fields is the Rust idiom for PATCH** — REST PATCH is awkward in statically-typed languages. `struct Update { field: Option<T> }` is the canonical pattern: `None` = unchanged, `Some` = set. Makes invalid states unrepresentable (can't accidentally "send field but not its value").
 - **Directories: Some replaces entirely** — even though individual key updates would be more flexible, replacing the whole map is simpler and matches the common case (user renames a directory = sends the new full map). Per-key merge is filed as v0.4.4.x+++++ if the need arises.
 - **The pattern of "no cmd test for env-var-touching" is solid** — we now have 38 tests, all touching env vars via EnvGuard + ENV_LOCK, all passing 5/5 parallel runs. Adding the 39th should be mechanical.
+
+## v0.4.6-perf (app.js module split)
+
+- **`window.__*` global namespace works for no-build SPAs** — IIFEs that attach to a single global, consumers destructure. The alternatives (ES modules + bundler, AMD, CommonJS) all require a build step. For a vanilla-JS SPA, globals are the lowest-friction path.
+- **Extracted module attachments are order-sensitive** — if api.js loads before bridge.js, `window.__bridge.invokeOrFetch` doesn't exist yet when api.js's IIFE runs. Solution: load dependencies first, dependents after. index.html order matters.
+- **Destructuring is the explicit-import substitute** — when you can't write `import { foo } from 'bar.js'`, `const { foo } = window.__bar;` is the equivalent. Makes the dependency visible in the first 5 lines of the consumer.
+- **Two-iteration review pattern** — first commit had bare references that broke at runtime; second pass fixed the destructuring. This is normal for refactors. The fix is in the SAME commit (not a follow-up) because the refactor wouldn't work without it. Don't try to ship the broken refactor and "fix in a follow-up" — the broken state is what you'd review, and it's worse than not shipping at all.
+- **Small PRs are easier to roll back** — 4 modules in this PR, not 14. If anything breaks, the diff is small enough to spot, revert, or patch in a focused follow-up. The remaining 1880 lines in app.js are still big, but the next split (pages/modals/cockpit-panels) is its own focused PR.

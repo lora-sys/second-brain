@@ -162,3 +162,11 @@
 - **Per-file vs per-directory lock** — config.json gets its own `.json.lock` (not `.sb-lock` which is for vault directories). Two lock namespaces prevents accidental cross-contamination and lets config updates happen while a vault read is in flight.
 - **Option<T> for patch semantics** — Rust idiom. Each field's `None` means "don't change", `Some(value)` means "set to this". Avoids accidental clobbering. The web SPA's PUT body already uses partial-update semantics; this matches.
 - **38/38 tests pass in parallel** — the pattern (ENV_LOCK + EnvGuard + atomic writes) continues to keep test stability.
+
+## 2026-07-13 (v0.4.6 perf — app.js module split)
+
+- **app.js split into 4 modules** — bridge (Tauri), state (shared), icons (16 SVGs), api (HTTP/invoke bridge). Each module is an IIFE that attaches to `window.__*` for global access. No build step required.
+- **Kept app.js at 1880 lines** — resisted the temptation to do a bigger refactor. Smaller PRs are easier to review and roll back.
+- **`window.__*` pattern over ES modules** — ES modules would require `<script type="module">` and a build step. The `window.__*` pattern is the lowest-friction for a no-build SPA.
+- **Two iterations to fix tauri/api not defined** — first commit had bare `tauri` and `api` references after the split; second pass added the destructuring from `window.__bridge` / `window.__api`. Both modes (standard + cockpit) now render with 0 console errors.
+- **Total LOC unchanged** — extracted modules are IIFEs that attach globals, so the line count is roughly the same. The win is in navigability and responsibility separation.
