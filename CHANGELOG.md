@@ -13,8 +13,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PDF preview
 - SQLite FTS5 for full-text search at scale
 - Theme system (custom palette + fonts)
+- v0.4.5.x: auto-restart after settings change
+- v0.4.5.x: inline directory editing (advanced)
+- v0.4.6a-e: perf debt (no-innerHTML, virtualize lists, skeleton states, async FS, debounce wikilink)
+- v0.4.L2.x: custom domain + Schema.org + auto-update landing stats
 
+## [0.4.0] - 2026-07-13
 
+### Added
+- **Tauri 2.0 desktop shell** — `src-tauri/` wraps the existing web frontend as a Linux desktop app (AppImage + .deb). 10 Tauri commands port the Node HTTP endpoints to Rust: `config_get`, `config_set`, `vault_list_all`, `vault_list_by_type`, `vault_read`, `vault_create`, `vault_update`, `vault_delete`, `vault_search`, `vault_link_import`. Bridge pattern (`invoke`/`fetch`) means the same code runs in browser and in the Tauri shell.
+- **Cockpit Today Page** (`?cockpit=1`) — multi-pane shell with sidebar nav. 12 sections: 今日 / 笔记库 / 任务 / 日程 / 回顾 / 资源库 / 标签 / 设置 + 3 placeholders (知识图谱 / 模板 / 智能体). Sections: today panel (感悟 / 成就 / 关注), right rail (任务与提醒 / 即将到来), bottom row (捕获的想法 / 收藏与书签 / 记忆回顾), notes (grouped by type), tags (cloud + click-to-filter), review (7-day recap), knowledge graph (wikilinks + tag overlap).
+- **Settings page** — vault path / port / host editor. Browser mode uses `PUT /api/config`; Tauri mode uses `config_set` invoke. Read-only directory display.
+- **Knowledge graph view** — top hubs ranked by degree, type distribution cards, edges with reason labels (`wikilink` or `#tag`).
+- **Landing page** (`docs/index.html`) — public face for the project. 6 features, 4 architecture pillars, 3 install steps. Auto-deployed to GitHub Pages with OpenGraph + custom 404.
+- **Real-device E2E tests** — `tests/e2e/real-device.mjs` (23 tests) covers standard mode + all 10 working cockpit sections + API contracts. Tests write results to `window.__testTally` for `playwright-cli` introspection.
+- **2 critical bug fixes** found by real-device E2E:
+  - cockpit's `renderContent` was wiping the adopted `<main id="main">` by setting `innerHTML` on `#cockpit-content`. Fix: `renderTarget()` prefers `#main` over `#cockpit-content`.
+  - `回顾` nav entry had `impl: 'soon'` despite being implemented in v0.4.c6.回顾. Fix: `impl: 'review'`.
+
+### Improved
+- `app.js` split into 4 modules (bridge, state, icons, api). Smaller, more focused files.
+- VaultRepo abstraction in Rust — `vault_list_by_type` is now type-aware.
+
+### Security
+- Tauri 2.0 capabilities minimal — no shell plugin, no arbitrary command execution. The only commands available are our 10 vault commands.
+- WebKit + Wayland compatibility — works on X11 fallback when Wayland compositor fails.
+
+### Build & Release
+- GitHub Actions: `release.yml` builds .deb + .AppImage + .rpm on tag push and creates a draft GitHub release with auto-generated notes.
+- GitHub Pages: `pages.yml` builds and deploys the landing page on every push to main.
+- Concurrency groups on both workflows prevent race conditions on rapid pushes.
+- Concurrency: withFileLock + withLockedMutation in vault.mjs (carried over from v0.4.1).
+
+### Verification
+- 49 Rust unit tests pass 5/5 (vault, frontmatter parser, wikilink extraction, link_import, VaultRepo)
+- 23 E2E tests pass (10 cockpit sections + 5 knowledge graph + 3 API + 5 navigation regression)
+- .deb package verified: 11MB binary + icons + .desktop file, deps on libwebkit2gtk-4.1-0 + libgtk-3-0
+- Browser console clean (0 errors) in both standard v3 mode and cockpit mode
 
 ## [0.3.0] - 2026-07-12
 
