@@ -2432,3 +2432,144 @@ body.cockpit-mode .app { display: none !important; }
   color: var(--text-soft);
 }
 .cockpit-notes-empty p { margin: 0; font-size: 13px; }
+
+/* ============================================================================
+ * v0.4.c8 — Cockpit Tags Management
+ * Tag cloud + click-to-filter entities. Multi-select with clear button.
+ * ========================================================================== */
+
+.cockpit-tags {
+  max-width: 880px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.cockpit-tags-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.cockpit-tags-hero svg { color: var(--accent-strong); flex-shrink: 0; }
+.cockpit-tags-hero h1 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+.cockpit-tags-hero p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.cockpit-tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.cockpit-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: all .12s;
+  font-family: var(--font-sans);
+}
+.cockpit-tag-chip:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.cockpit-tag-chip.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+.cockpit-tag-name { font-weight: 500; }
+.cockpit-tag-count {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-faint);
+  font-size: 10.5px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.cockpit-tag-chip.is-active .cockpit-tag-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+}
+
+.cockpit-tag-entities {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.cockpit-tag-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.cockpit-tag-clear {
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 2px 10px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+.cockpit-tag-clear:hover { background: var(--surface-3); }
+
+.cockpit-tags-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  color: var(--text-faint);
+}
+.cockpit-tags-empty svg { color: var(--text-faint); margin-bottom: 12px; }
+.cockpit-tags-empty h2 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.cockpit-tags-empty p { margin: 0; font-size: 13px; }
+.cockpit-tags-empty code {
+  background: var(--surface-3);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
