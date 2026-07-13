@@ -173,3 +173,11 @@ git log --oneline -5
 - **Compile warnings are not optional** — the "unused import" warning after the refactor was easy to miss (cargo check is silent unless --message-format=short shows the warning line). The fix was trivial (remove the use line) but matters because leaving stale imports is a code-rot signal.
 - **Read-only vs write-only abstractions** — VaultRepo is read-only because writes need locks. Don't try to make a "VaultRepo" do everything; the right answer is a trait (`VaultOps`) that has both `read()` and `write(|repo|)` methods. Filed v0.4.4.x+++++ for this.
 - **41 tests in <1s** — the test suite is now fast enough to run on every save. The ENV_LOCK + EnvGuard pattern keeps parallel runs deterministic. This is the foundation for adding more tests as the codebase grows.
+
+## v0.4.L1 (landing page)
+
+- **Single-file HTML with inline CSS is a viable landing page** — 18.6 KB, no JS, no build, no framework, no external deps except Google Fonts (with system fallbacks). Renders correctly on file:// and any static host.
+- **Reuse design tokens, don't reinvent** — the SPA already has 30+ CSS custom properties for colors, fonts, spacing. Lifting those into the landing page means the user sees a coherent visual language across app + marketing site. If the SPA changes a token, the landing page needs a corresponding update (filed v0.4.L1.x for a shared tokens.css).
+- **Don't add a build step to a project that explicitly avoids one** — AGENTS.md says "no build, no framework". v0.4.L1 respects that. A static page with inline CSS is enough for v0.4. If v0.5+ wants CMS-driven content, the build step comes with the CMS, not before.
+- **The Node server doesn't serve docs/ by default** — the existing static file serving is rooted at public/. The landing page lives in docs/ which is below public/. For local dev, file:// works. For production (GitHub Pages), the static host serves docs/index.html directly. Filed v0.4.L2: add a /docs route to the Node server, OR move docs/ into public/ (loses the "docs/" semantic).
+- **First-time dev experience** — v0.4.L1 is the first thing a new user will see (landing page → GitHub → README → install). It sets expectations. Investing 30 min in a clear, well-designed landing page is worth it for the project's credibility.
