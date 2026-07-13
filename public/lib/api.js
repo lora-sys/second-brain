@@ -41,11 +41,13 @@
         return api.put('/api/config', body);
       },
     },
-    // v0.4.5 — Tauri path: invoke('vault_list_all'). Browser path: fetch.
+    // v0.4.5 + v0.4.4.x++++ — Tauri: invoke('vault_list_all') or
+    // 'vault_list_by_type' (cheaper when type is given). Browser: fetch.
     list: (type) => {
-      if (tauri && !type) {
-        // No filtering on the Rust side yet (would need vault_list_by_type);
-        // we use vault_list_all and filter client-side.
+      if (tauri) {
+        if (type) {
+          return invokeOrFetch('vault_list_by_type', { entity_type: type }, `/api/entities?type=${type}`).then(d => d.items || []);
+        }
         return invokeOrFetch('vault_list_all', {}, '/api/entities').then(d => d.items);
       }
       return api.get(type ? `/api/entities?type=${type}` : '/api/entities').then(d => d.items);

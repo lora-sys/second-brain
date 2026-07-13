@@ -142,3 +142,34 @@
 - **Three iterations in the same commit is fine when the bug is in the same logical unit** — r#type, routeImplFor exposure, and the hardcoded-dashboard bug were all in the v0.4.c6 schedule feature. Splitting into 3 commits would have made each commit "not functional on its own" (since the schedule section wouldn't render until all 3 fixes are in). The right call is: land the feature + all 3 fixes in one commit, document the iterations in the review report, and move on.
 - **`window.__*` pattern made the route bug fix mechanical** — when the entity pre-load needed the route function, I just exposed routeImplFor as `window.__appRouteImpl`. No module import dance, no build step. The 3-min fix in the same commit was possible because the seam was already there.
 - **Cockpit pages are 60+ lines of helper + render + CSS** — schedule took ~80 lines of cockpit.js + ~150 lines of CSS. As more sections land (笔记库, 知识图谱, etc.), cockpit.js will balloon. v0.4.6.x filed for further split (schedule-buckets.js, schedule-page.js).
+
+## v0.4.c6.notes (cockpit section pattern reuse)
+
+- **Pattern transfer saves time** — v0.4.c6-schedule established the shape (hero + grouped sections with type-colored borders). v0.4.c6.notes reused it almost verbatim. ~30 min instead of ~2 hours.
+- **When a pattern is established, file the next one as a series** — 笔记库, 知识图谱, 回顾, 模板, 智能体 all follow the same template. Could do 4 more in the same week.
+- **Escape encoding in Python f-strings is treacherous** — `{` and `}` in Python f-strings conflict with `{` and `}` in JS template literals. The Python string with `{{` (escaped `{`) vs JS string with `{` is brittle. Use sed with explicit patterns when the substitution is single-line.
+- **Sidebar shows impl:'soon' as "SOON" badge** — easy to forget. When removing the soon status, also remove the badge. v0.4.6.x filed: add a `if (it.impl === 'soon')` check that ALSO verifies the route is unimpl'd.
+'''
+git add memory/decisions.md memory/lessons.md && git commit -m "docs: memory updates for v0.4.c6.notes" 2>&1 | tail -3
+
+python3 << 'PYEOF'
+with open('PROJECT_STATUS.md', 'r') as f:
+    s = f.read()
+s = s.replace(
+    "| #v0.4.c6.schedule | Cockpit 日程 section (timeline) | Cockpit UI | @coordinator | merged | ✅ Done |",
+    "| #v0.4.c6.schedule | Cockpit 日程 section (timeline) | Cockpit UI | @coordinator | merged | ✅ Done |\n| #v0.4.c6.notes | Cockpit 笔记库 section (all entities grouped) | Cockpit UI | @coordinator | merged | ✅ Done |"
+)
+with open('PROJECT_STATUS.md', 'w') as f:
+    f.write(s)
+print('updated')
+PYEOF
+git add PROJECT_STATUS.md && git commit -m "docs: project status update for v0.4.c6.notes" 2>&1 | tail -3
+git checkout main && git merge --no-ff feature/v0.4.c6-notes-section -m "merge: feature/v0.4.c6-notes-section (Cockpit 笔记库 grouped list)" 2>&1 | tail -3
+git log --oneline -5
+## v0.4.4.x++++ (VaultRepo refactor)
+
+- **Marker-based Python replace is brittle for multi-line patterns** — when matching a marker that ends mid-statement, the replacement needs to be a complete statement. Orphaned syntax fragments (like a stray `,`) cause compile errors that the python script can't catch (it's just text manipulation). Sed with explicit patterns is more reliable.
+- **Refactor one command at a time, run all tests after each** — vault_list_all was the first refactor (8 lines). All 38 pre-existing tests passed. Then vault_list_by_type was the second (uses the new pattern). 41/41 tests pass 5/5 parallel runs. The refactor is verified by the same tests that protected the old implementation.
+- **Compile warnings are not optional** — the "unused import" warning after the refactor was easy to miss (cargo check is silent unless --message-format=short shows the warning line). The fix was trivial (remove the use line) but matters because leaving stale imports is a code-rot signal.
+- **Read-only vs write-only abstractions** — VaultRepo is read-only because writes need locks. Don't try to make a "VaultRepo" do everything; the right answer is a trait (`VaultOps`) that has both `read()` and `write(|repo|)` methods. Filed v0.4.4.x+++++ for this.
+- **41 tests in <1s** — the test suite is now fast enough to run on every save. The ENV_LOCK + EnvGuard pattern keeps parallel runs deterministic. This is the foundation for adding more tests as the codebase grows.

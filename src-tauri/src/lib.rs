@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use walkdir::WalkDir;
+// WalkDir used inside VaultRepo
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -285,62 +285,8 @@ fn parse_id(id: &str) -> Result<(String, String), String> {
 
 #[tauri::command]
 fn vault_list_all() -> Result<Vec<Entity>, String> {
-    let cfg = config_get().map_err(|e| format!("config: {e}"))?;
-    let root = PathBuf::from(&cfg.vault_path);
-    if !root.exists() {
-        return Err(format!("vault path not found: {}", cfg.vault_path));
-    }
-
-    let mut entities: Vec<Entity> = Vec::new();
-    for t in TYPES {
-        // directory name: prefer directories[t], fallback to lowercase plural-ish
-        let dir_name = cfg
-            .directories
-            .get(*t)
-            .cloned()
-            .unwrap_or_else(|| t.to_string());
-        let dir = root.join(&dir_name);
-        if !dir.exists() {
-            // Silently skip missing dirs — vault may not have every type yet.
-            continue;
-        }
-        for entry in WalkDir::new(&dir)
-            .max_depth(1)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
-            let p = entry.path();
-            if !entry.file_type().is_file() { continue; }
-            if p.extension().and_then(|s| s.to_str()) != Some("md") { continue; }
-            let raw = match std::fs::read_to_string(p) {
-                Ok(s) => s,
-                Err(e) => {
-                    log::warn!("[vault] failed to read {}: {}", p.display(), e);
-                    continue;
-                }
-            };
-            let (data, body) = parse_frontmatter(&raw);
-            let slug = p
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_string();
-            let title = data
-                .get("title")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| slug.clone());
-            entities.push(Entity {
-                id: format!("{dir_name}/{slug}"),
-                r#type: (*t).to_string(),
-                slug,
-                title,
-                data,
-                body,
-                path: p.display().to_string(),
-            });
-        }
-    }
+    let repo = VaultRepo::open()?;
+    let mut entities = repo.walk();
     // Sort by updated desc if present, else title asc.
     entities.sort_by(|a, b| {
         let a_upd = a.data.get("updated").and_then(|v| v.as_str()).unwrap_or("");
@@ -593,6 +539,87 @@ fn vault_create(
     })
 }
 
+/// VaultRepo: a lightweight handle to the vault configuration + path.
+/// Encapsulates the cfg lookup + per-directory walking pattern so
+/// commands don't each re-implement it. Use `open()` to construct,
+/// then call `walk()` / `walk_type()` to enumerate entities.
+///
+/// Read-path only. The write-path commands (vault_create/update/delete)
+/// don't use it because they need per-directory file locks, which are
+/// orthogonal to "read what's in the vault".
+struct VaultRepo {
+    config: Config,
+    root: std::path::PathBuf,
+}
+
+impl VaultRepo {
+    fn open() -> Result<Self, String> {
+        let config = config_get()?;
+        let root = std::path::PathBuf::from(&config.vault_path);
+        if !root.exists() {
+            return Err(format!("vault path not found: {}", config.vault_path));
+        }
+        Ok(VaultRepo { config, root })
+    }
+
+    /// Walk every entity in every configured directory. Returned in
+    /// the order: person, task, project, link. Within each type, the
+    /// order is filesystem order (not sorted).
+    fn walk(&self) -> Vec<Entity> {
+        let mut out = Vec::new();
+        for t in TYPES {
+            out.extend(self.walk_type(t));
+        }
+        out
+    }
+
+    /// Walk entities of a single type. Empty Vec if the directory
+    /// doesn't exist or has no .md files.
+    fn walk_type(&self, entity_type: &str) -> Vec<Entity> {
+        let dir_name = match self.config.directories.get(entity_type) {
+            Some(d) => d.clone(),
+            None => return Vec::new(),
+        };
+        let dir = self.root.join(&dir_name);
+        if !dir.exists() {
+            return Vec::new();
+        }
+        let mut out = Vec::new();
+        for entry in walkdir::WalkDir::new(&dir).max_depth(1).into_iter().filter_map(Result::ok) {
+            if !entry.file_type().is_file() { continue; }
+            if entry.path().extension().and_then(|s| s.to_str()) != Some("md") { continue; }
+            let raw = match std::fs::read_to_string(entry.path()) {
+                Ok(s) => s,
+                Err(e) => { log::warn!("[vault] {}: {}", entry.path().display(), e); continue; }
+            };
+            let (data, body) = parse_frontmatter(&raw);
+            let slug = entry.path().file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+            let title = data.get("title").and_then(|v| v.as_str()).map(|s| s.to_string()).unwrap_or_else(|| slug.clone());
+            out.push(Entity {
+                id: format!("{dir_name}/{slug}"),
+                r#type: entity_type.to_string(),
+                slug,
+                title,
+                data,
+                body,
+                path: entry.path().display().to_string(),
+            });
+        }
+        out
+    }
+}
+
+/// Walk entities of a single type (Tauri command). Used by api.list(type)
+/// in Tauri mode (browser mode still uses /api/entities?type=X).
+#[tauri::command]
+fn vault_list_by_type(entity_type: String) -> Result<Vec<Entity>, String> {
+    if !TYPES.contains(&entity_type.as_str()) {
+        return Err(format!("invalid type: {entity_type}"));
+    }
+    let repo = VaultRepo::open()?;
+    Ok(repo.walk_type(&entity_type))
+}
+
 /// Minimal slugify: lowercase, replace whitespace with -, strip non-alphanumeric
 /// (Unicode letters/digits allowed), collapse multiple -, trim leading/trailing -,
 /// cap at 80 chars. Mirrors lib/frontmatter.mjs slugify.
@@ -683,7 +710,7 @@ pub fn run() {
             log::info!("second-brain v{} starting", env!("CARGO_PKG_VERSION"));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![config_get, config_set, vault_list_all, vault_read, vault_create, vault_update, vault_delete, vault_search])
+        .invoke_handler(tauri::generate_handler![config_get, config_set, vault_list_all, vault_list_by_type, vault_read, vault_create, vault_update, vault_delete, vault_search])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -1401,6 +1428,71 @@ mod tests {
             .filter(|e| e.file_name().to_string_lossy().starts_with(".tmp-"))
             .collect();
         assert!(stray_tmp.is_empty(), "no tmp files should remain");
+    }
+
+    #[test]
+    fn vault_list_by_type_filters_correctly() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        std::fs::create_dir_all(vault.join("20-Tasks")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People","task":"20-Tasks"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        // Create 2 people, 1 task
+        vault_create("person".to_string(), "Alice".to_string(), "".to_string(), None).unwrap();
+        vault_create("person".to_string(), "Bob".to_string(), "".to_string(), None).unwrap();
+        vault_create("task".to_string(), "Buy milk".to_string(), "".to_string(), None).unwrap();
+        // Filter to people
+        let people = vault_list_by_type("person".to_string()).unwrap();
+        assert_eq!(people.len(), 2);
+        for p in &people { assert_eq!(p.r#type, "person"); }
+        // Filter to tasks
+        let tasks = vault_list_by_type("task".to_string()).unwrap();
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].title, "Buy milk");
+        // Filter to link (no entries) — should return empty
+        let links = vault_list_by_type("link".to_string()).unwrap();
+        assert_eq!(links.len(), 0);
+    }
+
+    #[test]
+    fn vault_list_by_type_rejects_invalid() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(&vault).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let result = vault_list_by_type("monster".to_string());
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("invalid type"), "got: {err}");
+    }
+
+    #[test]
+    fn vault_list_by_type_missing_dir_returns_empty() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People","task":"20-Tasks"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        // 20-Tasks dir doesn't exist; calling vault_list_by_type("task") should return empty (not error)
+        let result = vault_list_by_type("task".to_string()).unwrap();
+        assert_eq!(result.len(), 0);
     }
 
     #[test]
