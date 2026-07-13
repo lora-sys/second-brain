@@ -36,7 +36,8 @@ _Last updated: 2026-07-12 by @coordinator_
 | #v0.4.c4 | Cockpit right rail (任务与提醒 + 即将到来) | Cockpit UI | @coordinator | merged | ✅ Done |
 | #v0.4.c5 | Cockpit bottom row (捕获/收藏/记忆回顾) | Cockpit UI | @coordinator | merged | ✅ Done |
 | #v0.4.c6.schedule | Cockpit 日程 section (timeline) | Cockpit UI | @coordinator | merged | ✅ Done |
-| #v0.4.c6.* | 其他 3 个 placeholder section (知识图谱/模板/智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |
+| #v0.4.c6.知识图谱 | Cockpit 知识图谱 section (wikilinks + tag overlap) | Cockpit UI | @coordinator | merged | ✅ Done |
+| #v0.4.c6.* | 其他 2 个 placeholder section (模板/智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |
 | #v0.4.7 | Real-device E2E tests + 2 critical bug fixes | Test | @coordinator | merged | ✅ Done |
 | #v0.4.L1 | Landing page (Track 4) | Web | @coordinator | merged | ✅ Done |
 | #v0.4.L2 | GitHub Pages deploy + OpenGraph + custom domain | Web | @coordinator | (follow-up) | Backlog |
@@ -97,6 +98,7 @@ _None._
 
 | PR | Title | Evidence |
 |---|---|---|
+| `259e396` | merge: feature/v0.4.c6-knowledge-graph (knowledge graph view) | [docs/evidence/v0.4.c6-knowledge/](evidence/v0.4.c6-knowledge/) |
 | `c148568` | merge: feature/v0.4.7-real-device-e2e (real-device E2E + 2 bug fixes) | [docs/evidence/v0.4.7-real-device/](evidence/v0.4.7-real-device/) |
 | `538b6d4` | docs: memory updates for v0.4.c3 | (in v0.4.c3 evidence) |
 | `4cf242a` | docs: memory updates for v0.4.5 | (in v0.4.5 evidence) |
