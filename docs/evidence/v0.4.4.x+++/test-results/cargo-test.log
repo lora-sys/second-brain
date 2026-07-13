@@ -1,0 +1,41 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/second_brain_lib-6ce9ac6c1b770d3e)
+
+running 34 tests
+test tests::config_get_missing_returns_error ... ok
+test tests::parse_frontmatter_missing_returns_body ... ok
+test tests::config_get_reads_minimal_config ... ok
+test tests::parse_frontmatter_unclosed_returns_body ... ok
+test tests::find_config_via_env ... ok
+test tests::parse_frontmatter_broken_yaml_salvages ... ok
+test tests::parse_id_basic ... ok
+test tests::parse_frontmatter_basic ... ok
+test tests::parse_id_rejects_empty ... ok
+test tests::parse_id_with_nested_path ... ok
+test tests::slugify_basic ... ok
+test tests::vault_create_atomic_no_tmp_files_left ... ok
+test tests::vault_read_invalid_id_returns_error ... ok
+test tests::vault_create_handles_slug_collision ... ok
+test tests::vault_create_rejects_empty_title ... ok
+test tests::vault_create_rejects_invalid_type ... ok
+test tests::vault_create_with_extra_data ... ok
+test tests::vault_create_writes_file ... ok
+test tests::vault_delete_missing_entity_returns_error ... ok
+test tests::vault_delete_removes_file ... ok
+test tests::vault_delete_to_trash_moves_file ... ok
+test tests::vault_list_all_reads_fixture_vault ... ok
+test tests::vault_search_case_insensitive ... ok
+test tests::vault_read_missing_entity_returns_error ... ok
+test tests::vault_read_returns_entity ... ok
+test tests::vault_search_empty_query_returns_error ... ok
+test tests::vault_search_finds_title_match ... ok
+test tests::vault_search_in_body ... ok
+test tests::vault_search_no_matches_returns_empty_vec ... ok
+test tests::vault_search_relevance_ranking ... ok
+test tests::vault_search_with_type_filter ... ok
+test tests::vault_update_missing_entity_returns_error ... ok
+test tests::vault_update_modifies_existing_file ... ok
+test tests::vault_update_preserves_unspecified_keys ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

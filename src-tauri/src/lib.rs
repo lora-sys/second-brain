@@ -260,6 +260,56 @@ fn vault_list_all() -> Result<Vec<Entity>, String> {
 }
 
 #[tauri::command]
+fn vault_search(query: String, type_filter: Option<String>) -> Result<Vec<Entity>, String> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return Err("query is required".to_string());
+    }
+    let all = vault_list_all()?;
+    let mut scored: Vec<(i32, Entity)> = all
+        .into_iter()
+        .filter_map(|e| {
+            // Optional type filter
+            if let Some(t) = &type_filter {
+                if t != &e.r#type { return None; }
+            }
+            let title = e.title.to_lowercase();
+            let body = e.body.to_lowercase();
+            let title_match_idx = title.find(&q);
+            let body_match_idx = body.find(&q);
+            if title_match_idx.is_none() && body_match_idx.is_none() {
+                return None;
+            }
+            // Scoring: title match worth more than body match.
+            // Earlier title match worth more than later.
+            let mut score: i32 = 0;
+            if let Some(i) = title_match_idx {
+                score += 100;
+                // Earlier in title = higher
+                score += (50 - i as i32).max(0);
+                // Exact title match is a big bonus
+                if title == q { score += 500; }
+            }
+            if let Some(i) = body_match_idx {
+                score += 10;
+                score += (50 - i as i32).max(0);
+            }
+            Some((score, e))
+        })
+        .collect();
+    // Sort by score desc, then by updated desc as tiebreaker.
+    scored.sort_by(|a, b| {
+        b.0.cmp(&a.0)
+            .then_with(|| {
+                let ua = a.1.data.get("updated").and_then(|v| v.as_str()).unwrap_or("");
+                let ub = b.1.data.get("updated").and_then(|v| v.as_str()).unwrap_or("");
+                ub.cmp(ua)
+            })
+    });
+    Ok(scored.into_iter().map(|(_, e)| e).collect())
+}
+
+#[tauri::command]
 fn vault_update(
     id: String,
     data: Option<serde_json::Value>,
@@ -542,7 +592,7 @@ pub fn run() {
             log::info!("second-brain v{} starting", env!("CARGO_PKG_VERSION"));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![config_get, vault_list_all, vault_read, vault_create, vault_update, vault_delete])
+        .invoke_handler(tauri::generate_handler![config_get, vault_list_all, vault_read, vault_create, vault_update, vault_delete, vault_search])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -727,6 +777,145 @@ mod tests {
         assert_eq!(slugify(""), "untitled");
         assert_eq!(slugify("---"), "untitled");
         assert_eq!(slugify("a/b/c"), "a-b-c");
+    }
+
+    #[test]
+    fn vault_search_finds_title_match() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        vault_create("person".to_string(), "Alice Chen".to_string(), "".to_string(), None).unwrap();
+        vault_create("person".to_string(), "Bob Wang".to_string(), "".to_string(), None).unwrap();
+        vault_create("person".to_string(), "Alex Kim".to_string(), "".to_string(), None).unwrap();
+        let results = vault_search("alice".to_string(), None).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Alice Chen");
+    }
+
+    #[test]
+    fn vault_search_case_insensitive() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        vault_create("person".to_string(), "Alice Chen".to_string(), "".to_string(), None).unwrap();
+        let r1 = vault_search("ALICE".to_string(), None).unwrap();
+        let r2 = vault_search("ali".to_string(), None).unwrap();
+        let r3 = vault_search("chen".to_string(), None).unwrap();
+        assert_eq!(r1.len(), 1);
+        assert_eq!(r2.len(), 1);
+        assert_eq!(r3.len(), 1);
+    }
+
+    #[test]
+    fn vault_search_in_body() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        vault_create("person".to_string(), "Alice".to_string(), "She works on rust web frameworks".to_string(), None).unwrap();
+        vault_create("person".to_string(), "Bob".to_string(), "Loves cooking".to_string(), None).unwrap();
+        let results = vault_search("rust".to_string(), None).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Alice");
+    }
+
+    #[test]
+    fn vault_search_with_type_filter() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        std::fs::create_dir_all(vault.join("20-Tasks")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People","task":"20-Tasks"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        vault_create("person".to_string(), "Alice".to_string(), "".to_string(), None).unwrap();
+        vault_create("task".to_string(), "Alice review".to_string(), "".to_string(), None).unwrap();
+        let only_persons = vault_search("alice".to_string(), Some("person".to_string())).unwrap();
+        assert_eq!(only_persons.len(), 1);
+        assert_eq!(only_persons[0].r#type, "person");
+        let only_tasks = vault_search("alice".to_string(), Some("task".to_string())).unwrap();
+        assert_eq!(only_tasks.len(), 1);
+        assert_eq!(only_tasks[0].r#type, "task");
+    }
+
+    #[test]
+    fn vault_search_relevance_ranking() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        // Exact title match should rank highest
+        vault_create("person".to_string(), "Alice".to_string(), "".to_string(), None).unwrap();
+        // Title substring match
+        vault_create("person".to_string(), "Alice friend".to_string(), "".to_string(), None).unwrap();
+        // Body match only
+        vault_create("person".to_string(), "Bob".to_string(), "Knows alice".to_string(), None).unwrap();
+        let results = vault_search("alice".to_string(), None).unwrap();
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].title, "Alice", "exact title should rank first");
+    }
+
+    #[test]
+    fn vault_search_empty_query_returns_error() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(&vault).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        assert!(vault_search("".to_string(), None).is_err());
+        assert!(vault_search("   ".to_string(), None).is_err());
+    }
+
+    #[test]
+    fn vault_search_no_matches_returns_empty_vec() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        vault_create("person".to_string(), "Alice".to_string(), "".to_string(), None).unwrap();
+        let results = vault_search("zzznomatch".to_string(), None).unwrap();
+        assert!(results.is_empty());
     }
 
     #[test]
