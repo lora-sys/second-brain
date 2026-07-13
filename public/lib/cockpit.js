@@ -21,7 +21,7 @@
     { hash: '#/knowledge', label: '知识图谱', icon: 'graph', impl: 'soon' },
     { hash: '#/tasks', label: '任务', icon: 'check', impl: 'tasks' },
     { hash: '#/schedule', label: '日程', icon: 'calendar', impl: 'schedule' },
-    { hash: '#/review', label: '回顾', icon: 'eye', impl: 'soon' },
+    { hash: '#/review', label: '回顾', icon: 'eye', impl: 'review' },
   ];
   const NAV_RESOURCES = [
     { hash: '#/resources', label: '资源库', icon: 'folder', impl: 'links' },
@@ -878,24 +878,33 @@
   }
 
   // Track which v3 elements we've moved so renderShell is idempotent.
-  let moved = false;
+  let movedMain = false;
+  let movedTitle = false;
   function adoptV3Elements(overlay) {
-    if (moved) return;
     const cockpitContent = overlay.querySelector('#cockpit-content');
-    const v3Main = document.getElementById('main');
-    if (v3Main && cockpitContent && v3Main.parentElement !== cockpitContent) {
-      v3Main.classList.add('cockpit-main-host');
-      cockpitContent.appendChild(v3Main);
+    // Move <main id="main"> into cockpit-content so v3 renderers
+    // (renderTasks, renderLinks) can write to #main.innerHTML.
+    // Skip if already inside cockpit-content. Retry on every call:
+    // if #main didn't exist yet (race with app.js boot), try again next call.
+    if (!movedMain) {
+      const v3Main = document.getElementById('main');
+      if (v3Main && cockpitContent && v3Main.parentElement !== cockpitContent) {
+        v3Main.classList.add('cockpit-main-host');
+        cockpitContent.appendChild(v3Main);
+        movedMain = true;
+      }
     }
-    const v3PageTitle = document.getElementById('page-title');
-    const cockpitTitle = overlay.querySelector('#cockpit-title');
-    if (v3PageTitle && cockpitTitle) {
-      v3PageTitle.style.display = 'none';
-      const sync = () => { cockpitTitle.textContent = v3PageTitle.textContent || cockpitTitle.textContent; };
-      new MutationObserver(sync).observe(v3PageTitle, { childList: true, characterData: true, subtree: true });
-      sync();
+    if (!movedTitle) {
+      const v3PageTitle = document.getElementById('page-title');
+      const cockpitTitle = overlay.querySelector('#cockpit-title');
+      if (v3PageTitle && cockpitTitle) {
+        v3PageTitle.style.display = 'none';
+        const sync = () => { cockpitTitle.textContent = v3PageTitle.textContent || cockpitTitle.textContent; };
+        new MutationObserver(sync).observe(v3PageTitle, { childList: true, characterData: true, subtree: true });
+        sync();
+        movedTitle = true;
+      }
     }
-    moved = true;
   }
 
   function renderShell() {
@@ -994,8 +1003,15 @@
       + '</div>';
   }
 
+  // Resolve the dynamic content target: prefer the adopted <main id="main">
+  // (so v3 renderers like __renderTasks can write to #main.innerHTML).
+  // Fall back to #cockpit-content for first-paint before adoption completes.
+  function renderTarget() {
+    return document.getElementById('main') || document.getElementById('cockpit-content');
+  }
+
   async function renderContent(route, hash) {
-    const content = document.getElementById('cockpit-content');
+    const content = renderTarget();
     if (!content) return;
     setActive(hash || location.hash || '#/dashboard');
     try {
@@ -1031,7 +1047,8 @@
       content.innerHTML = placeholder(map[route] || route, '该模块正在 v0.4 后续 issue 中实现。');
     } catch (err) {
       console.error('[cockpit] renderContent failed:', err);
-      content.innerHTML = '<div class="cockpit-error">渲染失败：' + esc(err.message) + '</div>';
+      const t = renderTarget() || document.getElementById('cockpit-content');
+      if (t) t.innerHTML = '<div class="cockpit-error">渲染失败：' + esc(err.message) + '</div>';
     }
   }
 
