@@ -457,6 +457,121 @@
     ].join('');
   }
 
+    // -------------------- Tags helpers (v0.4.c8) --------------------
+  function collectAllTags(state) {
+    // Build a { tagName: [items] } map across all entity types.
+    const out = {};
+    const e = state && state.entities;
+    if (!e) return out;
+    for (const type of ['person', 'task', 'project', 'link']) {
+      for (const item of (e[type] || [])) {
+        const tags = (item.data && item.data.tags) || [];
+        for (const t of tags) {
+          if (!t) continue;
+          if (!out[t]) out[t] = [];
+          out[t].push({ ...item, _type: type });
+        }
+      }
+    }
+    return out;
+  }
+  function renderTags(state) {
+    const all = collectAllTags(state);
+    const totalTags = Object.keys(all).length;
+    const totalItems = Object.values(all).reduce((s, arr) => s + arr.length, 0);
+    if (totalTags === 0) {
+      return [
+        '<div class="cockpit-tags">',
+          '<div class="cockpit-tags-empty">',
+            icon('tag', 28),
+            '<h2>还没有标签</h2>',
+            '<p>编辑 entity 时加 <code>tags: [a, b, c]</code> 就会出现。</p>',
+          '</div>',
+        '</div>'
+      ].join('');
+    }
+    // Sort tags by count desc, then alphabetically
+    const sortedTags = Object.entries(all).sort((a, b) => {
+      if (b[1].length !== a[1].length) return b[1].length - a[1].length;
+      return a[0].localeCompare(b[0]);
+    });
+    const tagCloudHtml = sortedTags.map(([tag, items]) => {
+      return '<button class="cockpit-tag-chip" data-tag="' + esc(tag) + '">' +
+        '<span class="cockpit-tag-name">#' + esc(tag) + '</span>' +
+        '<span class="cockpit-tag-count">' + items.length + '</span>' +
+        '</button>';
+    }).join('');
+    return [
+      '<div class="cockpit-tags">',
+        '<header class="cockpit-tags-hero">',
+          icon('tag', 24),
+          '<div>',
+            '<h1>标签</h1>',
+            '<p>' + totalTags + ' 个标签，跨 ' + totalItems + ' 个 entry。点击标签查看相关 entries。</p>',
+          '</div>',
+        '</header>',
+        '<div class="cockpit-tag-cloud" id="cockpit-tag-cloud">' + tagCloudHtml + '</div>',
+        '<div class="cockpit-tag-entities" id="cockpit-tag-entities"></div>',
+      '</div>'
+    ].join('');
+  }
+  // After renderTags sets innerHTML, attach click handlers for filtering.
+  // This is called from the caller after setting innerHTML — wraps the DOM.
+  function bindTagClicks(content) {
+    const chips = content.querySelectorAll('.cockpit-tag-chip');
+    const target = content.querySelector('#cockpit-tag-entities');
+    if (!chips.length || !target) return;
+    chips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const tag = chip.dataset.tag;
+        const isActive = chip.classList.toggle('is-active');
+        if (!isActive) {
+          chip.classList.remove('is-active');
+        }
+        // Recompute selected tags and re-render the entities panel.
+        const selected = Array.from(content.querySelectorAll('.cockpit-tag-chip.is-active'))
+          .map((c) => c.dataset.tag);
+        if (selected.length === 0) {
+          target.innerHTML = '<p class="cockpit-block-empty">点击上面的标签查看相关 entries</p>';
+          return;
+        }
+        const all = collectAllTags(window.__state.state);
+        const matching = new Set();
+        for (const t of selected) {
+          for (const it of (all[t] || [])) matching.add(it);
+        }
+        const items = Array.from(matching).sort((a, b) => {
+          const ua = (a.data && a.data.updated) || '';
+          const ub = (b.data && b.data.updated) || '';
+          return ub.localeCompare(ua);
+        });
+        const itemsHtml = items.map((it) => {
+          const title = it.title || it.slug;
+          return '<a class="cockpit-notes-item" href="#/entity/' + esc(it.id) + '">' +
+            '<span class="cockpit-list-dot dot-' + esc(it._type) + '"></span>' +
+            '<span class="cockpit-notes-title">' + esc(title) + '</span>' +
+            '<span class="cockpit-list-meta">' + esc(((it.data && it.data.updated) || '').slice(0, 10)) + '</span>' +
+            '</a>';
+        }).join('');
+        target.innerHTML = [
+          '<div class="cockpit-tag-results-header">',
+            '<span>显示 ' + items.length + ' 个 entry</span>',
+            '<button class="cockpit-tag-clear" data-action="clear-tags">清除筛选</button>',
+          '</div>',
+          '<div class="cockpit-notes-list">' + itemsHtml + '</div>',
+        ].join('');
+        // Wire the clear button
+        const clearBtn = target.querySelector('[data-action="clear-tags"]');
+        if (clearBtn) {
+          clearBtn.addEventListener('click', () => {
+            chips.forEach((c) => c.classList.remove('is-active'));
+            target.innerHTML = '<p class="cockpit-block-empty">点击上面的标签查看相关 entries</p>';
+          });
+        }
+      });
+    });
+  }
+
     function renderTodayPanel() {
     const state = (window.__appState) || { entities: { person: [], task: [], project: [], link: [] } };
     const reflection = pickReflection(state);
@@ -677,15 +792,8 @@
         return;
       }
       if (route === 'tags') {
-        if (window.__refreshCounts) { try { await window.__refreshCounts(); } catch {} }
-        content.insertAdjacentHTML('beforeend',
-          '<div class="cockpit-tags">'
-          + '<header class="cockpit-tags-header">'
-          + '<h1 class="cockpit-tags-title">标签</h1>'
-          + '<p class="cockpit-tags-sub">v0.4.c8 将提供完整的标签管理界面（合并、筛选、保存视图）。</p>'
-          + '</header>'
-          + '<div class="cockpit-tag-cloud" id="cockpit-tag-cloud"></div>'
-          + '</div>');
+        content.innerHTML = renderTags(state);
+        bindTagClicks(content);
         return;
       }
       const map = [].concat(NAV_PRIMARY, NAV_RESOURCES).reduce((m, it) => (m[it.impl] = it.label, m), {});
