@@ -260,6 +260,120 @@ fn vault_list_all() -> Result<Vec<Entity>, String> {
 }
 
 #[tauri::command]
+fn vault_update(
+    id: String,
+    data: Option<serde_json::Value>,
+    body: Option<String>,
+) -> Result<Entity, String> {
+    let (dir_name, slug) = parse_id(&id)?;
+    let cfg = config_get().map_err(|e| format!("config: {e}"))?;
+    let entity_type = cfg
+        .directories
+        .iter()
+        .find(|(_, v)| v.as_str() == dir_name.as_str())
+        .map(|(k, _)| k.clone())
+        .ok_or_else(|| format!("unknown directory: {dir_name}"))?;
+    let vault_root = std::path::PathBuf::from(&cfg.vault_path);
+    let dir = vault_root.join(&dir_name);
+    let file_path = dir.join(format!("{slug}.md"));
+    if !file_path.exists() {
+        return Err(format!("entity not found: {id}"));
+    }
+
+    // Read existing frontmatter so we can preserve unspecified keys.
+    let existing_raw = std::fs::read_to_string(&file_path)
+        .map_err(|e| format!("read {}: {}", file_path.display(), e))?;
+    let (existing_data, _existing_body) = parse_frontmatter(&existing_raw);
+
+    // Merge: existing + new overrides (but caller can't blank keys).
+    let mut fm = existing_data.as_object().cloned().unwrap_or_default();
+    if let Some(serde_json::Value::Object(obj)) = data {
+        for (k, v) in obj {
+            fm.insert(k, v);
+        }
+    }
+    // title/type come from the existing entity unless caller explicitly set them.
+    if !fm.contains_key("title") {
+        fm.insert("title".to_string(), serde_json::Value::String(slug.clone()));
+    }
+    if !fm.contains_key("type") {
+        fm.insert("type".to_string(), serde_json::Value::String(entity_type.clone()));
+    }
+    // Always update the 'updated' field.
+    let now = chrono_like_now();
+    fm.insert("updated".to_string(), serde_json::Value::String(now));
+
+    let yaml = serde_yaml::to_string(&serde_json::Value::Object(fm.clone()))
+        .map_err(|e| format!("yaml serialize: {e}"))?;
+    let new_body_str = match &body {
+        Some(b) => format!("\n{}\n", b.trim_end_matches('\n')),
+        None => _existing_body,
+    };
+    let file_content = format!("---\n{yaml}---\n{new_body_str}");
+
+    // Acquire lock, atomic write.
+    let lock = acquire_dir_lock(&dir).map_err(|e| format!("lock {}: {}", dir.display(), e))?;
+    let write_result = (|| -> Result<(), String> {
+        let tmp = dir.join(format!(".tmp-{}-{}", std::process::id(), slug));
+        std::fs::write(&tmp, file_content.as_bytes()).map_err(|e| format!("write {}: {}", tmp.display(), e))?;
+        std::fs::rename(&tmp, &file_path).map_err(|e| format!("rename {}: {}", tmp.display(), e))?;
+        Ok(())
+    })();
+    release_dir_lock(lock);
+    write_result?;
+
+    let title = fm.get("title").and_then(|v| v.as_str()).map(|s| s.to_string()).unwrap_or_else(|| slug.clone());
+    Ok(Entity {
+        id: format!("{dir_name}/{slug}"),
+        r#type: entity_type,
+        slug,
+        title,
+        data: serde_json::Value::Object(fm),
+        body: new_body_str,
+        path: file_path.display().to_string(),
+    })
+}
+
+#[tauri::command]
+fn vault_delete(id: String, trash: Option<bool>) -> Result<(), String> {
+    let use_trash = trash.unwrap_or(false);
+    let (dir_name, slug) = parse_id(&id)?;
+    let cfg = config_get().map_err(|e| format!("config: {e}"))?;
+    let vault_root = std::path::PathBuf::from(&cfg.vault_path);
+    let dir = vault_root.join(&dir_name);
+    let file_path = dir.join(format!("{slug}.md"));
+    if !file_path.exists() {
+        return Err(format!("entity not found: {id}"));
+    }
+    if use_trash {
+        let trash_dir = vault_root.join(".trash");
+        std::fs::create_dir_all(&trash_dir)
+            .map_err(|e| format!("create trash dir: {e}"))?;
+        let lock = acquire_dir_lock(&dir)
+            .map_err(|e| format!("lock {}: {}", dir.display(), e))?;
+        let result = (|| -> Result<(), String> {
+            let dest = trash_dir.join(format!("{}-{}.md", slug, chrono_like_now().replace([':', '.'], "-")));
+            std::fs::rename(&file_path, &dest)
+                .map_err(|e| format!("rename to trash: {e}"))?;
+            Ok(())
+        })();
+        release_dir_lock(lock);
+        result?;
+    } else {
+        let lock = acquire_dir_lock(&dir)
+            .map_err(|e| format!("lock {}: {}", dir.display(), e))?;
+        let result = (|| -> Result<(), String> {
+            std::fs::remove_file(&file_path)
+                .map_err(|e| format!("remove: {e}"))?;
+            Ok(())
+        })();
+        release_dir_lock(lock);
+        result?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn vault_create(
     entity_type: String,
     title: String,
@@ -428,7 +542,7 @@ pub fn run() {
             log::info!("second-brain v{} starting", env!("CARGO_PKG_VERSION"));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![config_get, vault_list_all, vault_read, vault_create])
+        .invoke_handler(tauri::generate_handler![config_get, vault_list_all, vault_read, vault_create, vault_update, vault_delete])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -732,6 +846,149 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.contains("title"), "got: {err}");
+    }
+
+    #[test]
+    fn vault_update_modifies_existing_file() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("20-Tasks")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"task":"20-Tasks"}}}}"#, vault.display()),
+        ).unwrap();
+        // Pre-create an entity
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let created = vault_create(
+            "task".to_string(),
+            "Original title".to_string(),
+            "Original body".to_string(),
+            None,
+        ).unwrap();
+        // Update it
+        let update = vault_update(
+            created.id.clone(),
+            Some(serde_json::json!({"status": "done"})),
+            Some("Updated body".to_string()),
+        ).unwrap();
+        assert_eq!(update.id, created.id);
+        assert_eq!(update.title, "Original title");
+        // 'status' was added, 'updated' was bumped
+        assert_eq!(update.data.get("status").and_then(|v| v.as_str()), Some("done"));
+        assert!(update.data.get("updated").is_some());
+        // Body was replaced
+        assert!(update.body.contains("Updated body"));
+        assert!(!update.body.contains("Original body"));
+    }
+
+    #[test]
+    fn vault_update_preserves_unspecified_keys() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("20-Tasks")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"task":"20-Tasks"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let created = vault_create(
+            "task".to_string(),
+            "Title".to_string(),
+            "".to_string(),
+            Some(serde_json::json!({"priority": "high", "tags": ["urgent"]})),
+        ).unwrap();
+        let update = vault_update(created.id.clone(), None, Some("new body".to_string())).unwrap();
+        // priority + tags should be preserved
+        assert_eq!(update.data.get("priority").and_then(|v| v.as_str()), Some("high"));
+        assert!(update.data.get("tags").is_some());
+        // updated was bumped
+        assert!(update.data.get("updated").is_some());
+    }
+
+    #[test]
+    fn vault_update_missing_entity_returns_error() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("20-Tasks")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"task":"20-Tasks"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let result = vault_update("20-Tasks/nonexistent".to_string(), None, Some("x".to_string()));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("not found"), "got: {err}");
+    }
+
+    #[test]
+    fn vault_delete_removes_file() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let created = vault_create("person".to_string(), "ToDelete".to_string(), "".to_string(), None).unwrap();
+        let file_path = vault.join("10-People").join("todelete.md");
+        assert!(file_path.exists());
+        vault_delete(created.id.clone(), None).unwrap();
+        assert!(!file_path.exists());
+    }
+
+    #[test]
+    fn vault_delete_to_trash_moves_file() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let created = vault_create("person".to_string(), "TrashMe".to_string(), "".to_string(), None).unwrap();
+        let file_path = vault.join("10-People").join("trashme.md");
+        assert!(file_path.exists());
+        vault_delete(created.id.clone(), Some(true)).unwrap();
+        assert!(!file_path.exists());
+        // File should be in .trash
+        let trash_dir = vault.join(".trash");
+        assert!(trash_dir.exists());
+        let trash_files: Vec<_> = std::fs::read_dir(&trash_dir).unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().contains("trashme"))
+            .collect();
+        assert_eq!(trash_files.len(), 1, "file should be in trash");
+    }
+
+    #[test]
+    fn vault_delete_missing_entity_returns_error() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let result = vault_delete("10-People/nonexistent".to_string(), None);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("not found"), "got: {err}");
     }
 
     #[test]

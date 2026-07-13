@@ -124,8 +124,30 @@
       }
       return api.post('/api/entities', body);
     },
-    update: (id, body) => api.put(`/api/entities/${encodeURIComponent(id)}`, body),
-    delete: (id) => api.del(`/api/entities/${encodeURIComponent(id)}`),
+    update: (id, body) => {
+      if (tauri) {
+        // vault_update(id, {data, body}) — only the fields the caller
+        // sends are overwritten; everything else is preserved.
+        return invokeOrFetch(
+          'vault_update',
+          { id, data: body && body.data, body: body && body.body },
+          `/api/entities/${encodeURIComponent(id)}`,
+          { method: 'PUT', body: JSON.stringify(body || {}) }
+        );
+      }
+      return api.put(`/api/entities/${encodeURIComponent(id)}`, body);
+    },
+    delete: (id) => {
+      if (tauri) {
+        return invokeOrFetch(
+          'vault_delete',
+          { id, trash: false },
+          `/api/entities/${encodeURIComponent(id)}`,
+          { method: 'DELETE' }
+        );
+      }
+      return api.del(`/api/entities/${encodeURIComponent(id)}`);
+    },
     search: (q) => api.get(`/api/search?q=${encodeURIComponent(q)}`),
     dashboard: () => api.get('/api/dashboard'),
     importLink: (body) => api.post('/api/links/import', body),
