@@ -1821,6 +1821,7 @@
     if (route === 'people' || route === 'projects') return 'soon';
     if (route === 'tags') return 'tags';
     if (route === 'schedule') return 'schedule';
+    if (route === 'notes') return 'notes';
     return 'soon';
   };
   function routeImplFor(route) {
@@ -1831,6 +1832,7 @@
     if (route === 'people' || route === 'projects') return 'soon';
     if (route === 'tags') return 'tags';
     if (route === 'schedule') return 'schedule';
+    if (route === 'notes') return 'notes';
     return 'soon';
   }
 

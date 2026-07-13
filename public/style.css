@@ -2304,3 +2304,131 @@ body.cockpit-mode .app { display: none !important; }
   border-radius: 3px;
   font-size: 12px;
 }
+
+/* ============================================================================
+ * v0.4.c6.notes — Cockpit Notes Section
+ * List all entities grouped by type. Click to navigate to entity detail.
+ * ========================================================================== */
+
+.cockpit-notes {
+  max-width: 880px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cockpit-notes-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.cockpit-notes-hero svg { color: var(--type-project); flex-shrink: 0; }
+.cockpit-notes-hero h1 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+.cockpit-notes-hero p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.cockpit-notes-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 14px 20px;
+}
+.cockpit-notes-section.type-person { border-left: 3px solid var(--type-person); }
+.cockpit-notes-section.type-task { border-left: 3px solid var(--type-task); }
+.cockpit-notes-section.type-project { border-left: 3px solid var(--type-project); }
+.cockpit-notes-section.type-link { border-left: 3px solid var(--type-link); }
+.cockpit-notes-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.cockpit-notes-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  flex: 1;
+}
+.cockpit-notes-count {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.cockpit-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.cockpit-notes-item {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border-soft);
+  text-decoration: none;
+  color: var(--text);
+  font-size: 13.5px;
+  transition: color var(--t-fast);
+}
+.cockpit-notes-item:last-child { border-bottom: none; }
+.cockpit-notes-item:hover .cockpit-notes-title { color: var(--accent-strong); }
+.cockpit-notes-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.cockpit-notes-tags {
+  display: flex;
+  gap: 4px;
+}
+.cockpit-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  color: var(--text-faint);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+.cockpit-notes-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  color: var(--text-faint);
+}
+.cockpit-notes-empty svg { color: var(--text-faint); margin-bottom: 12px; }
+.cockpit-notes-empty h2 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.cockpit-notes-empty p { margin: 0; font-size: 13px; }
