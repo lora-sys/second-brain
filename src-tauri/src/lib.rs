@@ -122,6 +122,97 @@ fn parse_frontmatter(raw: &str) -> (serde_json::Value, String) {
     (data, body)
 }
 
+#[derive(Debug, Deserialize, Clone)]
+struct ConfigUpdate {
+    #[serde(default)]
+    vault_path: Option<String>,
+    #[serde(default)]
+    port: Option<u16>,
+    #[serde(default)]
+    host: Option<String>,
+    /// Directories map (replaces entirely if Some, preserves if None)
+    #[serde(default)]
+    directories: Option<HashMap<String, String>>,
+}
+
+#[tauri::command]
+fn config_set(update: ConfigUpdate) -> Result<Config, String> {
+    // Read the current config (must exist)
+    let path = find_config().ok_or_else(|| {
+        "config.json not found; cannot update".to_string()
+    })?;
+    let raw = std::fs::read_to_string(&path)
+        .map_err(|e| format!("read {}: {}", path.display(), e))?;
+    let mut current: Config = serde_json::from_str(&raw)
+        .map_err(|e| format!("parse {}: {}", path.display(), e))?;
+
+    // Apply updates (only the fields that are Some)
+    if let Some(vp) = &update.vault_path {
+        if vp.trim().is_empty() {
+            return Err("vaultPath cannot be empty".to_string());
+        }
+        current.vault_path = vp.clone();
+    }
+    if let Some(p) = update.port {
+        current.port = Some(p);
+    }
+    if let Some(h) = &update.host {
+        current.host = Some(h.clone());
+    }
+    if let Some(d) = update.directories {
+        current.directories = d;
+    }
+
+    // Validate: vault path must exist (warning if not; we still allow setting
+    // to a path the user will create later — they may be configuring first).
+    let new_path = std::path::PathBuf::from(&current.vault_path);
+    if !new_path.exists() {
+        // Not an error — the user might be configuring a path that doesn't
+        // exist yet. We just don't create the dirs.
+    }
+
+    // Serialize and write atomically.
+    let new_raw = serde_json::to_string_pretty(&current)
+        .map_err(|e| format!("serialize: {e}"))?;
+    let lock = acquire_file_lock(&path)
+        .map_err(|e| format!("lock {}: {}", path.display(), e))?;
+    let write_result = (|| -> Result<(), String> {
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, new_raw.as_bytes())
+            .map_err(|e| format!("write {}: {}", tmp.display(), e))?;
+        std::fs::rename(&tmp, &path)
+            .map_err(|e| format!("rename {}: {}", tmp.display(), e))?;
+        Ok(())
+    })();
+    release_file_lock(lock);
+    write_result?;
+    Ok(current)
+}
+
+/// Per-file lock (different from acquire_dir_lock which is per-directory).
+/// Used by config_set to prevent concurrent config writes.
+fn acquire_file_lock(path: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    let lock_path = path.with_extension("json.lock");
+    for _ in 0..50 {
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock_path)
+        {
+            Ok(_) => return Ok(lock_path),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            Err(e) => return Err(format!("open {}: {}", lock_path.display(), e)),
+        }
+    }
+    Err(format!("could not acquire lock {}", lock_path.display()))
+}
+
+fn release_file_lock(lock_path: std::path::PathBuf) {
+    let _ = std::fs::remove_file(&lock_path);
+}
+
 #[tauri::command]
 fn config_get() -> Result<Config, String> {
     let path = find_config().ok_or_else(|| {
@@ -592,7 +683,7 @@ pub fn run() {
             log::info!("second-brain v{} starting", env!("CARGO_PKG_VERSION"));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![config_get, vault_list_all, vault_read, vault_create, vault_update, vault_delete, vault_search])
+        .invoke_handler(tauri::generate_handler![config_get, config_set, vault_list_all, vault_read, vault_create, vault_update, vault_delete, vault_search])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -899,6 +990,115 @@ mod tests {
         let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
         assert!(vault_search("".to_string(), None).is_err());
         assert!(vault_search("   ".to_string(), None).is_err());
+    }
+
+    #[test]
+    fn config_set_updates_fields() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(&vault).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        let initial = format!(
+            r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#,
+            vault.display()
+        );
+        std::fs::write(&cfg_path, initial).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        // Update vault path
+        let new_vault = dir.path().join("new-vault");
+        std::fs::create_dir_all(&new_vault).unwrap();
+        let updated = config_set(ConfigUpdate {
+            vault_path: Some(new_vault.display().to_string()),
+            port: Some(8080),
+            host: Some("0.0.0.0".to_string()),
+            directories: None,
+        }).unwrap();
+        assert_eq!(updated.vault_path, new_vault.display().to_string());
+        assert_eq!(updated.port, Some(8080));
+        assert_eq!(updated.host, Some("0.0.0.0".to_string()));
+        // Verify by reading again
+        let reread = config_get().unwrap();
+        assert_eq!(reread.vault_path, new_vault.display().to_string());
+        assert_eq!(reread.port, Some(8080));
+        // Directories were NOT replaced (None) — preserved
+        assert_eq!(reread.directories.get("person").map(|s| s.as_str()), Some("10-People"));
+    }
+
+    #[test]
+    fn config_set_replaces_directories_when_some() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(&vault).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let new_dirs: HashMap<String, String> = [
+            ("person".to_string(), "People".to_string()),
+            ("task".to_string(), "Tasks".to_string()),
+        ].iter().cloned().collect();
+        let updated = config_set(ConfigUpdate {
+            vault_path: None,
+            port: None,
+            host: None,
+            directories: Some(new_dirs.clone()),
+        }).unwrap();
+        assert_eq!(updated.directories, new_dirs);
+    }
+
+    #[test]
+    fn config_set_rejects_empty_vault_path() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(&vault).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let result = config_set(ConfigUpdate {
+            vault_path: Some("   ".to_string()),
+            port: None,
+            host: None,
+            directories: None,
+        });
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("empty"), "got: {err}");
+    }
+
+    #[test]
+    fn config_set_atomic_writes_via_tmp() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(&vault).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        config_set(ConfigUpdate {
+            vault_path: Some("/new/path".to_string()),
+            port: None,
+            host: None,
+            directories: None,
+        }).unwrap();
+        // The .json.tmp should not remain
+        let stray: Vec<_> = std::fs::read_dir(dir.path()).unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().contains(".tmp") || e.file_name().to_string_lossy().contains(".lock"))
+            .collect();
+        assert!(stray.is_empty(), "no tmp/lock files should remain, got: {:?}", stray.iter().map(|e| e.path()).collect::<Vec<_>>());
+        // .json.lock specifically should be gone
+        assert!(!cfg_path.with_extension("json.lock").exists());
     }
 
     #[test]

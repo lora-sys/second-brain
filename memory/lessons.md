@@ -119,3 +119,10 @@
 - **URL parsing in JS is unforgiving** — `new URL(str)` throws on malformed strings. Always wrap in try/catch when the string is user-derived (bookmark URLs especially). The fix is one line; the bug without it is "page doesn't load because cockpit crashed".
 - **Standard mode regression is mandatory** — every time we add to cockpit, the standard v0.3 SPA might break. 30 seconds of test prevents an embarrassing "v0.3 broke" PR.
 - **8 panels is a lot** — at some point the cockpit becomes overwhelming. v0.4.6 polish: introduce panel collapse, or split the day into "focus" (今日 only) vs "review" (all panels).
+
+## v0.4.4.x++++ (config_set)
+
+- **Per-file vs per-directory lock** — when a file system has multiple "namespaces" (e.g. config file + vault directories), each should have its own lock file. Sharing one lock across namespaces causes contention and unclear ownership. The Rust code now has `acquire_dir_lock` (vault ops) and `acquire_file_lock` (config). Same retry semantics, different lock paths.
+- **Patch semantics via Option fields is the Rust idiom for PATCH** — REST PATCH is awkward in statically-typed languages. `struct Update { field: Option<T> }` is the canonical pattern: `None` = unchanged, `Some` = set. Makes invalid states unrepresentable (can't accidentally "send field but not its value").
+- **Directories: Some replaces entirely** — even though individual key updates would be more flexible, replacing the whole map is simpler and matches the common case (user renames a directory = sends the new full map). Per-key merge is filed as v0.4.4.x+++++ if the need arises.
+- **The pattern of "no cmd test for env-var-touching" is solid** — we now have 38 tests, all touching env vars via EnvGuard + ENV_LOCK, all passing 5/5 parallel runs. Adding the 39th should be mechanical.

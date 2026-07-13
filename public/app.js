@@ -94,7 +94,18 @@
     config: {
       // v0.4.5 — Tauri path: invoke('config_get'). Browser path: fetch.
       get: () => invokeOrFetch('config_get', {}, '/api/config'),
-      put: (body) => api.put('/api/config', body),
+      put: (body) => {
+        if (tauri) {
+          // config_set takes only the fields that should change; null = unchanged
+          return invokeOrFetch('config_set', {
+            vaultPath: body && body.vaultPath,
+            port: body && body.port,
+            host: body && body.host,
+            directories: body && body.directories,
+          }, '/api/config', { method: 'PUT', body: JSON.stringify(body || {}) });
+        }
+        return api.put('/api/config', body);
+      },
     },
     // v0.4.5 — Tauri path: invoke('vault_list_all'). Browser path: fetch.
     list: (type) => {
