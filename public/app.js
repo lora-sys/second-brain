@@ -1820,6 +1820,8 @@
     if (route === 'links') return 'links';
     if (route === 'people' || route === 'projects') return 'soon';
     if (route === 'tags') return 'tags';
+    if (route === 'review') return 'review';
+    if (route === 'review') return 'review';
     if (route === 'schedule') return 'schedule';
     if (route === 'notes') return 'notes';
     return 'soon';
@@ -1831,6 +1833,7 @@
     if (route === 'links') return 'links';
     if (route === 'people' || route === 'projects') return 'soon';
     if (route === 'tags') return 'tags';
+    if (route === 'review') return 'review';
     if (route === 'schedule') return 'schedule';
     if (route === 'notes') return 'notes';
     return 'soon';

@@ -572,6 +572,138 @@
     });
   }
 
+    // -------------------- Review helpers (v0.4.c6.回顾) --------------------
+  function reviewBuckets(state) {
+    // Last 7 days of activity, grouped by day. Each bucket is a date
+    // (YYYY-MM-DD) and a list of items updated on that day.
+    const now = new Date();
+    const dayMs = 86400000;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const horizon = today.getTime() - 7 * dayMs; // 7 days back, midnight
+    const buckets = []; // [{ date: Date, label: '今天' | '昨天' | 'N 天前' | 'M月D日', items: [items] }]
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(today.getTime() - i * dayMs);
+      buckets.push({ date: day, items: [] });
+    }
+    const labelFor = (day) => {
+      if (day.getTime() === today.getTime()) return '今天';
+      if (day.getTime() === today.getTime() - dayMs) return '昨天';
+      const diff = Math.round((today.getTime() - day.getTime()) / dayMs);
+      return diff + ' 天前';
+    };
+    const e = state && state.entities;
+    if (e) {
+      for (const type of ['person', 'task', 'project', 'link']) {
+        for (const item of (e[type] || [])) {
+          const upd = (item.data && item.data.updated) || '';
+          if (!upd) continue;
+          const t = new Date(upd);
+          if (isNaN(t.getTime())) continue;
+          const dayStart = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
+          if (dayStart < horizon) continue;
+          for (const b of buckets) {
+            if (b.date.getTime() === dayStart) {
+              b.items.push({ ...item, _type: type });
+              break;
+            }
+          }
+        }
+      }
+    }
+    // Sort each bucket by updated desc
+    for (const b of buckets) {
+      b.items.sort((a, b2) => {
+        const ua = (a.data && a.data.updated) || '';
+        const ub = (b2.data && b2.data.updated) || '';
+        return ub.localeCompare(ua);
+      });
+    }
+    return buckets.map((b) => ({ ...b, label: labelFor(b.date) }));
+  }
+  function topTagsThisWeek(state) {
+    // Count tag usage across entities updated in the last 7 days.
+    const now = new Date();
+    const dayMs = 86400000;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const horizon = today.getTime() - 7 * dayMs;
+    const counts = {};
+    const e = state && state.entities;
+    if (!e) return [];
+    for (const type of ['person', 'task', 'project', 'link']) {
+      for (const item of (e[type] || [])) {
+        const upd = (item.data && item.data.updated) || '';
+        if (!upd) continue;
+        const t = new Date(upd);
+        if (isNaN(t.getTime())) continue;
+        const dayStart = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
+        if (dayStart < horizon) continue;
+        for (const tag of (item.data && item.data.tags) || []) {
+          counts[tag] = (counts[tag] || 0) + 1;
+        }
+      }
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  }
+  function renderReview(state) {
+    const buckets = reviewBuckets(state);
+    const topTags = topTagsThisWeek(state);
+    const totalUpdates = buckets.reduce((s, b) => s + b.items.length, 0);
+    if (totalUpdates === 0 && topTags.length === 0) {
+      return [
+        '<div class="cockpit-review">',
+          '<div class="cockpit-review-empty">',
+            icon('history', 28),
+            '<h2>过去 7 天没有任何活动</h2>',
+            '<p>新建一个 entry 就会出现在这里。</p>',
+          '</div>',
+        '</div>'
+      ].join('');
+    }
+    const daySections = buckets.filter(b => b.items.length > 0).map(b => {
+      const itemsHtml = b.items.map(item => {
+        const title = item.title || item.slug;
+        return '<a class="cockpit-notes-item" href="#/entity/' + esc(item.id) + '">' +
+          '<span class="cockpit-list-dot dot-' + esc(item._type) + '"></span>' +
+          '<span class="cockpit-notes-title">' + esc(title) + '</span>' +
+          '<span class="cockpit-list-meta">' + esc(((item.data && item.data.updated) || '').slice(11, 16)) + '</span>' +
+        '</a>';
+      }).join('');
+      return [
+        '<section class="cockpit-review-day">',
+          '<header class="cockpit-review-day-header">',
+            '<h2 class="cockpit-review-day-title">' + esc(b.label) + '</h2>',
+            '<span class="cockpit-review-day-count">' + b.items.length + '</span>',
+          '</header>',
+          '<div class="cockpit-notes-list">' + itemsHtml + '</div>',
+        '</section>'
+      ].join('');
+    }).join('');
+    const tagCloudHtml = topTags.length
+      ? '<div class="cockpit-review-tags">' + topTags.map(([t, n]) =>
+        '<span class="cockpit-review-tag-chip">#' + esc(t) + '<span class="cockpit-review-tag-count">' + n + '</span></span>'
+      ).join('') + '</div>'
+      : '<p class="cockpit-block-empty">过去 7 天没有标签活动。</p>';
+    return [
+      '<div class="cockpit-review">',
+        '<header class="cockpit-review-hero">',
+          icon('history', 24),
+          '<div>',
+            '<h1>回顾</h1>',
+            '<p>过去 7 天 ' + totalUpdates + ' 次更新。按时段分组，最热门的标签：</p>',
+          '</div>',
+        '</header>',
+        '<section class="cockpit-review-section-block">',
+          '<header class="cockpit-block-header">',
+            '<span class="cockpit-block-icon">' + icon('tag', 14) + '</span>',
+            '<h2 class="cockpit-block-title">热门标签（过去 7 天）</h2>',
+          '</header>',
+          tagCloudHtml,
+        '</section>',
+        daySections,
+      '</div>'
+    ].join('');
+  }
+
     function renderTodayPanel() {
     const state = (window.__appState) || { entities: { person: [], task: [], project: [], link: [] } };
     const reflection = pickReflection(state);
@@ -794,6 +926,10 @@
       if (route === 'tags') {
         content.innerHTML = renderTags(state);
         bindTagClicks(content);
+        return;
+      }
+      if (route === 'review') {
+        content.innerHTML = renderReview(state);
         return;
       }
       const map = [].concat(NAV_PRIMARY, NAV_RESOURCES).reduce((m, it) => (m[it.impl] = it.label, m), {});
