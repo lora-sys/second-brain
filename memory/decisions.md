@@ -91,3 +91,11 @@
 - **Entities pre-loaded in bootCockpit** — `api.list()` runs after config.get(); when entities arrive, re-render the today panel so it has real data.
 - **Found and fixed a latent crash in server.mjs** — `(a.data.due || '').localeCompare(...)` blew up when js-yaml parsed `due: 2026-07-12` as a Date object (bare ISO timestamps are auto-parsed). Without this fix, /api/dashboard returned 500 and EVERY consumer (cockpit + standard) showed the spinner forever. Wrapped with `String(...)` coercion.
 - **Vocab mismatch surfaced** — tasks with `status: open` or `doing` aren't counted in tasksByStatus because the server checks for `todo`/`in_progress`. Filed as v0.4.c3 polish.
+
+## 2026-07-13 (v0.4.c4 cockpit right rail landed)
+
+- **Right rail shipped** (commit pending merge) — 任务与提醒 + 即将到来. 2-column layout with sticky rail. The "today panel" is now: header + 3-block grid (main) + 2-block rail.
+- **Relative due labels** — "逾期 N 天 / 今天 / 明天 / N 天后" via `parseDateOnly + diff`. Cleaner than showing raw dates in the UI.
+- **Priority badge** — `高` (red pill) / `低` (gray pill) / null. Hard-coded map for now.
+- **Tasks pre-loaded via api.list()** in bootCockpit (c3 work) feeds the rail. Without that, the rail would be empty.
+- **TZ bug noted** — `js-yaml` parses `due: 2026-07-12` as UTC midnight Date. In TZ east of UTC, this becomes the previous day local. Tasks due "today" appear as "yesterday" locally. Filed as v0.4.c4 polish (strip time component when comparing).
