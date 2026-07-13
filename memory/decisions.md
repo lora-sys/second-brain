@@ -246,3 +246,12 @@
 - **Settings page in the cockpit** — 4th resourced sidebar item. Lets users edit vaultPath/port/host via the form. Tauri mode uses config_set invoke, browser mode uses PUT /api/config (existing bridge).
 - **3 attempts** to get the form pre-filling + correct nav highlight working. Final: 0 console errors, 0 warnings.
 - **directories shown read-only** — user can see the type→path mapping but can't edit it (most users don't need to). Filed v0.4.5.x for inline directory editing in a future "advanced" view.
+
+## 2026-07-13 (v0.4.7 real-device E2E landed)
+
+- **Real-device E2E tests now surface pass/fail counts** — `tests/e2e/real-device.mjs` writes results to `window.__testTally` so the caller can read them via `playwright-cli eval`. The old `console.log`-based approach was invisible to the test runner. Pattern: every test should be self-reporting.
+- **2 critical bugs found and fixed in the same round** — (1) cockpit's `renderContent` was wiping the adopted `<main id="main">` by setting `innerHTML` on `#cockpit-content`. (2) `回顾` sidebar entry had `impl: 'soon'` despite being implemented in v0.4.c6.回顾. Both fixed in one commit.
+- **Test count moved from 10 to 11** — the c7 test was passing with 10 because the runner wasn't surfacing results. Real nav-item count is 11 (6 primary + 5 resources). Now both c7 and real-device tests agree on 11.
+- **Tauri binary runs but can't render in this dev env** — known GPU sandbox limitation. PID alive after 4s, no crashes. Real-device UI verification waits for v0.4.7.x on actual hardware.
+- **.deb package verified** — 11MB binary + icons + .desktop file. control field correct (depends on libwebkit2gtk-4.1-0, libgtk-3-0).
+- **88 commits on main** — project is feature-complete for v0.4 + 1 bug-fix round.
