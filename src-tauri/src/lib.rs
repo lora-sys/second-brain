@@ -189,6 +189,161 @@ fn config_set(update: ConfigUpdate) -> Result<Config, String> {
     Ok(current)
 }
 
+#[tauri::command]
+fn vault_link_import(url: String, title_hint: Option<String>, tags: Option<Vec<String>>) -> Result<Entity, String> {
+    // Fetch the URL and extract the title (or fall back to a slug of the URL).
+    // The HTTP client is short-lived; the entity is written via the
+    // shared vault_create path which uses the file lock.
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("SecondBrainOS/0.4 (+https://github.com/lora-sys/second-brain)")
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("http client: {e}"))?;
+    let resp = client.get(&url).send().map_err(|e| format!("fetch: {e}"))?;
+    let status = resp.status();
+    let text = resp.text().map_err(|e| format!("read body: {e}"))?;
+    let extracted_title = parse_html_title(&text);
+    let final_title = match (title_hint, extracted_title) {
+        (Some(t), _) if !t.trim().is_empty() => t,
+        (_, Some(t)) if !t.is_empty() => t,
+        _ => derive_title_from_url(&url),
+    };
+    let mut data_map = serde_json::Map::new();
+    data_map.insert("url".to_string(), serde_json::Value::String(url.clone()));
+    if let Some(tags) = tags {
+        data_map.insert("tags".to_string(), serde_json::Value::Array(
+            tags.into_iter().map(serde_json::Value::String).collect()
+        ));
+    }
+    data_map.insert("fetchStatus".to_string(),
+        serde_json::Value::String(if status.is_success() { "ok".to_string() } else { "failed".to_string() }));
+    if !status.is_success() {
+        return Err(format!("fetch returned {}", status));
+    }
+    // Delegate to vault_create with the parsed data.
+    let created = vault_create("link".to_string(), final_title, String::new(), Some(serde_json::Value::Object(data_map)))?;
+    Ok(created)
+}
+
+/// Extract a title from HTML. Tries <title>, then <meta property="og:title">,
+/// then <meta name="twitter:title">. Returns the inner-text stripped of
+/// whitespace. Returns None if no title is found.
+fn parse_html_title(html: &str) -> Option<String> {
+    // Try <title>...</title> first
+    if let Some(start) = html.find("<title") {
+        if let Some(gt) = html[start..].find('>') {
+            let content_start = start + gt + 1;
+            if let Some(end) = html[content_start..].find("</title>") {
+                let raw = &html[content_start..content_start + end];
+                return Some(decode_html_entities(raw.trim()));
+            }
+        }
+    }
+    // Try <meta property="og:title" content="..." />
+    if let Some(t) = extract_meta_content(html, "property", "og:title") {
+        return Some(decode_html_entities(t.trim()));
+    }
+    if let Some(t) = extract_meta_content(html, "name", "twitter:title") {
+        return Some(decode_html_entities(t.trim()));
+    }
+    None
+}
+
+fn extract_meta_content(html: &str, attr: &str, value: &str) -> Option<String> {
+    // Find each <meta ...> tag, check if it has the desired attr/value
+    // (supporting both single and double quotes), and if so extract the
+    // content attribute. Tag-by-tag scan (no regex dep) keeps the
+    // function portable.
+    let mut pos = 0;
+    while let Some(open_rel) = html[pos..].find("<meta") {
+        let tag_start = pos + open_rel;
+        let tag_end_rel = match html[tag_start..].find('>') {
+            Some(i) => i,
+            None => return None,
+        };
+        let tag_end = tag_start + tag_end_rel;
+        let tag = &html[tag_start..=tag_end];
+        let needle_sq = format!("{}='{}'", attr, value);
+        let needle_dq = format!("{}=\"{}\"", attr, value);
+        let found = if let Some(at_pos) = tag.find(&needle_sq) {
+            (at_pos, '\'')
+        } else if let Some(at_pos) = tag.find(&needle_dq) {
+            (at_pos, '"')
+        } else {
+            pos = tag_end + 1;
+            continue;
+        };
+        let (at_pos, quote) = found;
+        let after_attr = at_pos + needle_sq.len();
+        if let Some(c_rel) = tag[after_attr..].find("content=") {
+            let c_abs = after_attr + c_rel + 8;
+            let bytes = tag.as_bytes();
+            if c_abs < bytes.len() {
+                let q = bytes[c_abs] as char;
+                if q == '"' || q == '\'' {
+                    let val_start = c_abs + 1;
+                    let val_rest = &tag[val_start..];
+                    let end_q = if q == '"' {
+                        val_rest.find('"')
+                    } else {
+                        val_rest.find('\'')
+                    };
+                    if let Some(eq) = end_q {
+                        return Some(val_rest[..eq].to_string());
+                    }
+                }
+            }
+        }
+        pos = tag_end + 1;
+    }
+    None
+}
+
+fn decode_html_entities(s: &str) -> String {
+    // Minimal HTML entity decoder — covers the common cases.
+    s.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+        .replace("&nbsp;", " ")
+}
+
+/// If we can't get a title from the HTML, derive one from the URL
+/// (last non-empty PATH segment, dashes for spaces, capitalized).
+/// "https://example.com/" → "Untitled" (no path).
+/// "https://example.com/blog/post-1" → "post 1".
+fn derive_title_from_url(url: &str) -> String {
+    let path = url.split('?').next().unwrap_or(url).trim_end_matches('/');
+    // Skip past the "scheme://host" part to get the path only.
+    let path_only = match path.find("//") {
+        Some(idx) => &path[idx + 2..],
+        None => path,
+    };
+    // If the path-only still starts with a host (no /), there's no path.
+    // Find first '/' in path_only — everything before is host.
+    let real_path = match path_only.find('/') {
+        Some(idx) => &path_only[idx..],
+        None => return "Untitled".to_string(),
+    };
+    let mut last = real_path.trim_start_matches('/').rsplit('/').next().unwrap_or("").to_string();
+    if last.is_empty() { return "Untitled".to_string(); }
+    // Strip common file extensions so "some-post.html" → "some post".
+    for ext in &["html", "htm", "php", "asp", "aspx", "jsp", "do", "action"] {
+        if let Some(stripped) = last.strip_suffix(&format!(".{ext}")) {
+            last = stripped.to_string();
+            break;
+        }
+    }
+    let cleaned = last
+        .replace(|c: char| !c.is_alphanumeric(), " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if cleaned.is_empty() { "Untitled".to_string() } else { cleaned }
+}
+
 /// Per-file lock (different from acquire_dir_lock which is per-directory).
 /// Used by config_set to prevent concurrent config writes.
 fn acquire_file_lock(path: &std::path::Path) -> Result<std::path::PathBuf, String> {
@@ -710,7 +865,7 @@ pub fn run() {
             log::info!("second-brain v{} starting", env!("CARGO_PKG_VERSION"));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![config_get, config_set, vault_list_all, vault_list_by_type, vault_read, vault_create, vault_update, vault_delete, vault_search])
+        .invoke_handler(tauri::generate_handler![config_get, config_set, vault_list_all, vault_list_by_type, vault_read, vault_create, vault_update, vault_delete, vault_search, vault_link_import])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -1493,6 +1648,56 @@ mod tests {
         // 20-Tasks dir doesn't exist; calling vault_list_by_type("task") should return empty (not error)
         let result = vault_list_by_type("task".to_string()).unwrap();
         assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn parse_html_title_basic() {
+        let html = "<html><head><title>Hello World</title></head><body></body></html>";
+        assert_eq!(parse_html_title(html), Some("Hello World".to_string()));
+    }
+
+    #[test]
+    fn parse_html_title_og_fallback() {
+        let html = "<html><head><meta property='og:title' content='OG Title' /></head><body></body></html>";
+        assert_eq!(parse_html_title(html), Some("OG Title".to_string()));
+    }
+
+    #[test]
+    fn parse_html_title_twitter_fallback() {
+        let html = "<html><head><meta name='twitter:title' content='Tw Title' /></head><body></body></html>";
+        assert_eq!(parse_html_title(html), Some("Tw Title".to_string()));
+    }
+
+    #[test]
+    fn parse_html_title_none() {
+        let html = "<html><head></head><body></body></html>";
+        assert_eq!(parse_html_title(html), None);
+    }
+
+    #[test]
+    fn parse_html_title_with_whitespace() {
+        let html = "<html><head><title>  Spaced Out  </title></head></html>";
+        assert_eq!(parse_html_title(html), Some("Spaced Out".to_string()));
+    }
+
+    #[test]
+    fn parse_html_title_decodes_entities() {
+        let html = "<html><head><title>Foo &amp; Bar</title></head></html>";
+        assert_eq!(parse_html_title(html), Some("Foo & Bar".to_string()));
+    }
+
+    #[test]
+    fn derive_title_from_url_basic() {
+        assert_eq!(derive_title_from_url("https://example.com/blog/hello-world"), "hello world");
+        assert_eq!(derive_title_from_url("https://example.com/"), "Untitled");
+        assert_eq!(derive_title_from_url("https://example.com/2026/01/01/some-post.html"), "some post");
+    }
+
+    #[test]
+    fn decode_html_entities_basic() {
+        assert_eq!(decode_html_entities("&lt;tag&gt;"), "<tag>");
+        assert_eq!(decode_html_entities("a &amp; b"), "a & b");
+        assert_eq!(decode_html_entities("no entities"), "no entities");
     }
 
     #[test]
