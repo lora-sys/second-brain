@@ -7,162 +7,15 @@
 (() => {
   'use strict';
 
-  // ============================ State =================================
-  const state = {
-    config: null,
-    counts: { person: 0, task: 0, project: 0, link: 0 },
-    entities: { person: [], task: [], project: [], link: [] },
-    tasksByStatus: null,
-    dueTasks: null,
-    recent: null,
-    tags: null,
-    current: null,
-    theme: localStorage.getItem('sb-theme') || 'light',
-    activeTagFilters: new Set(),  // for tag filter chips on list pages
-    allEntities: [],  // pre-loaded index for wikilink autocomplete
-    searchResults: [],
-    searchActiveIndex: -1,
-  };
-
-  // ============================ Tauri bridge ==========================
-  // v0.4.5 — when running inside the Tauri webview, route API calls
-  // through invoke() so they hit the Rust commands in src-tauri (v0.4.4).
-  // When running in a plain browser (web showcase), fall back to fetch()
-  // against the Node HTTP server.
-
-  const tauri = (() => {
-    try {
-      // Tauri 2.0 exposes __TAURI_INTERNALS__ in the webview.
-      // The invoke function lives at window.__TAURI__.core.invoke (v2)
-      // or window.__TAURI_INVOKE__ (older). We probe both.
-      if (window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') {
-        return { kind: 'v2', invoke: window.__TAURI__.core.invoke };
-      }
-      if (typeof window.__TAURI_INVOKE__ === 'function') {
-        return { kind: 'v1', invoke: window.__TAURI_INVOKE__ };
-      }
-    } catch {}
-    return null;
-  })();
-
-  async function invokeOrFetch(cmd, args, fetchPath, fetchOpts = {}) {
-    if (tauri) {
-      try {
-        const data = await tauri.invoke(cmd, args || {});
-        return normalizeTauri(cmd, data);
-      } catch (err) {
-        const msg = String((err && err.message) || err);
-        console.warn(`[bridge] invoke('${cmd}') failed: ${msg}; falling back to fetch`);
-        // Fall through to fetch.
-      }
-    }
-    const res = await fetch(fetchPath, {
-      headers: { 'content-type': 'application/json' },
-      ...fetchOpts,
-    });
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
-    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-    return data;
-  }
-
-  // Normalize the shape returned by Rust commands to match what the rest
-  // of the SPA expects from the Node HTTP server. Right now only
-  // vault_list_all needs shape adaptation (returns Vec<Entity> vs the
-  // {items: [...]} envelope).
-  function normalizeTauri(cmd, data) {
-    if (cmd === 'vault_list_all') return { items: data || [] };
-    return data;
-  }
+  // state is loaded from public/lib/state.js (window.__state)
+  const { state } = window.__state;
+  // api is loaded from public/lib/api.js (window.__api.api)
+  const { api } = window.__api;
 
   // ============================ API ===================================
-  const api = {
-    async req(path, opts = {}) {
-      const res = await fetch(path, {
-        headers: { 'content-type': 'application/json' },
-        ...opts,
-      });
-      const text = await res.text();
-      const data = text ? JSON.parse(text) : null;
-      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-      return data;
-    },
-    get(path) { return this.req(path); },
-    post(path, body) { return this.req(path, { method: 'POST', body: JSON.stringify(body || {}) }); },
-    put(path, body) { return this.req(path, { method: 'PUT', body: JSON.stringify(body || {}) }); },
-    del(path) { return this.req(path, { method: 'DELETE' }); },
-    config: {
-      // v0.4.5 — Tauri path: invoke('config_get'). Browser path: fetch.
-      get: () => invokeOrFetch('config_get', {}, '/api/config'),
-      put: (body) => {
-        if (tauri) {
-          // config_set takes only the fields that should change; null = unchanged
-          return invokeOrFetch('config_set', {
-            vaultPath: body && body.vaultPath,
-            port: body && body.port,
-            host: body && body.host,
-            directories: body && body.directories,
-          }, '/api/config', { method: 'PUT', body: JSON.stringify(body || {}) });
-        }
-        return api.put('/api/config', body);
-      },
-    },
-    // v0.4.5 — Tauri path: invoke('vault_list_all'). Browser path: fetch.
-    list: (type) => {
-      if (tauri && !type) {
-        // No filtering on the Rust side yet (would need vault_list_by_type);
-        // we use vault_list_all and filter client-side.
-        return invokeOrFetch('vault_list_all', {}, '/api/entities').then(d => d.items);
-      }
-      return api.get(type ? `/api/entities?type=${type}` : '/api/entities').then(d => d.items);
-    },
-    read: (id) => invokeOrFetch('vault_read', { id }, `/api/entities/${encodeURIComponent(id)}`),
-    create: (body) => {
-      // Tauri: invoke('vault_create', { entity_type, title, body, data })
-      // Browser: POST /api/entities
-      if (tauri) {
-        return invokeOrFetch(
-          'vault_create',
-          {
-            entity_type: body && body.type,
-            title: body && (body.title || body.name),
-            body: body && (body.body || ''),
-            data: body && body.data,
-          },
-          '/api/entities',
-          { method: 'POST', body: JSON.stringify(body || {}) }
-        );
-      }
-      return api.post('/api/entities', body);
-    },
-    update: (id, body) => {
-      if (tauri) {
-        // vault_update(id, {data, body}) — only the fields the caller
-        // sends are overwritten; everything else is preserved.
-        return invokeOrFetch(
-          'vault_update',
-          { id, data: body && body.data, body: body && body.body },
-          `/api/entities/${encodeURIComponent(id)}`,
-          { method: 'PUT', body: JSON.stringify(body || {}) }
-        );
-      }
-      return api.put(`/api/entities/${encodeURIComponent(id)}`, body);
-    },
-    delete: (id) => {
-      if (tauri) {
-        return invokeOrFetch(
-          'vault_delete',
-          { id, trash: false },
-          `/api/entities/${encodeURIComponent(id)}`,
-          { method: 'DELETE' }
-        );
-      }
-      return api.del(`/api/entities/${encodeURIComponent(id)}`);
-    },
-    search: (q) => invokeOrFetch('vault_search', { query: q, type_filter: null }, `/api/search?q=${encodeURIComponent(q)}`),
-    dashboard: () => api.get('/api/dashboard'),
-    importLink: (body) => api.post('/api/links/import', body),
-  };
+  // bridge.js (loaded before app.js via <script src="/lib/bridge.js">) attaches
+  // window.__bridge.{tauri, invokeOrFetch}. We destructure it here.
+  const { tauri, invokeOrFetch } = window.__bridge;
 
   // Expose bridge state for cockpit + dev-tools introspection
   window.__secondBrainBridge = { tauri: !!tauri, kind: tauri ? tauri.kind : null };
@@ -559,26 +412,8 @@
     }
   }
 
-  // ============================ Icons =================================
-  const ICONS = {
-    home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
-    user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
-    check: '<polyline points="20 6 9 17 4 12"/>',
-    folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
-    link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
-    settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>',
-    trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6 17.5 20a2 2 0 0 1-2 2H8.5a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>',
-    edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
-    calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
-    moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
-    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
-    inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
-    cmd: '<path d="M9 6V3a3 3 0 1 1 6 0v3h3a3 3 0 1 1 0 6h-3v3a3 3 0 1 1-6 0v-3H6a3 3 0 1 1 0-6h3z"/>',
-    tag: '<path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
-    palette: '<circle cx="13.5" cy="6.5" r="0.5"/><circle cx="17.5" cy="10.5" r="0.5"/><circle cx="8.5" cy="7.5" r="0.5"/><circle cx="6.5" cy="12.5" r="0.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>',
-    arrowRight: '<path d="M5 12h14M12 5l7 7-7 7"/>',
-  };
+  // ICONS dict is loaded from public/lib/icons.js (window.__ICONS)
+  const ICONS = (window.__ICONS && window.__ICONS.ICONS) || {};
   function iconSvg(name, size = 16) {
     const path = ICONS[name] || '';
     return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
