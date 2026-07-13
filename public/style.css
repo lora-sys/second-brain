@@ -2806,3 +2806,171 @@ body.cockpit-mode .app { display: none !important; }
   padding-top: 16px;
   border-top: 1px solid var(--border-soft);
 }
+
+/* ============================================================================
+ * v0.4.c6.知识图谱 — Cockpit Knowledge Graph Section
+ * Lists hubs (most-connected entities) with their relationships.
+ * Connections come from wikilinks + shared tags.
+ * ========================================================================== */
+
+.cockpit-knowledge { max-width: 1100px; margin: 0 auto; }
+.cockpit-knowledge-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  background: var(--surface-1);
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+}
+.cockpit-knowledge-hero svg {
+  color: var(--accent-strong);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.cockpit-knowledge-hero h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 600;
+}
+.cockpit-knowledge-hero p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.cockpit-knowledge-clusters {
+  margin-bottom: 24px;
+}
+.cockpit-knowledge-clusters h2 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cockpit-knowledge-cluster-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.cockpit-knowledge-cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--surface-1);
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  border-left-width: 3px;
+}
+.cockpit-knowledge-cluster.cluster-person { border-left-color: #ea580c; }
+.cockpit-knowledge-cluster.cluster-task { border-left-color: #0284c7; }
+.cockpit-knowledge-cluster.cluster-project { border-left-color: #7c3aed; }
+.cockpit-knowledge-cluster.cluster-link { border-left-color: #059669; }
+.cockpit-knowledge-cluster-label {
+  font-size: 12px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cockpit-knowledge-cluster-count {
+  font-size: 24px;
+  font-weight: 600;
+  font-feature-settings: "tnum";
+}
+
+.cockpit-knowledge-hubs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cockpit-knowledge-hub {
+  background: var(--surface-1);
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  padding: 16px 20px;
+}
+.cockpit-knowledge-hub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.cockpit-knowledge-hub-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+.cockpit-knowledge-hub-title:hover { color: var(--accent-strong); }
+.cockpit-knowledge-hub-degree {
+  font-size: 12px;
+  color: var(--text-soft);
+  padding: 3px 10px;
+  background: var(--surface-2);
+  border-radius: 12px;
+}
+
+.cockpit-knowledge-edges {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cockpit-knowledge-edge {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 13px;
+  transition: background 0.15s;
+}
+.cockpit-knowledge-edge:hover { background: var(--surface-3); }
+.cockpit-knowledge-edge-title { font-weight: 500; }
+.cockpit-knowledge-edge-reason {
+  font-size: 11px;
+  color: var(--text-soft);
+  padding: 2px 8px;
+  background: var(--surface-1);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+}
+
+.cockpit-knowledge-more {
+  margin-top: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-soft);
+  text-align: center;
+  font-style: italic;
+}
+
+.cockpit-knowledge-empty {
+  text-align: center;
+  padding: 60px 20px;
+  background: var(--surface-1);
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+}
+.cockpit-knowledge-empty svg { color: var(--text-faint); margin-bottom: 12px; }
+.cockpit-knowledge-empty h2 { margin: 0 0 6px; font-size: 16px; }
+.cockpit-knowledge-empty p { margin: 0; font-size: 13px; color: var(--text-soft); }
+.cockpit-knowledge-empty code {
+  font-family: var(--font-mono);
+  background: var(--surface-2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}

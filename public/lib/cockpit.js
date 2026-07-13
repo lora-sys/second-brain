@@ -18,7 +18,7 @@
   const NAV_PRIMARY = [
     { hash: '#/dashboard', label: '今日', icon: 'home', impl: 'dashboard' },
     { hash: '#/notes', label: '笔记库', icon: 'note', impl: 'notes' },
-    { hash: '#/knowledge', label: '知识图谱', icon: 'graph', impl: 'soon' },
+    { hash: '#/knowledge', label: '知识图谱', icon: 'graph', impl: 'knowledge' },
     { hash: '#/tasks', label: '任务', icon: 'check', impl: 'tasks' },
     { hash: '#/schedule', label: '日程', icon: 'calendar', impl: 'schedule' },
     { hash: '#/review', label: '回顾', icon: 'eye', impl: 'review' },
@@ -1003,7 +1003,175 @@
       + '</div>';
   }
 
-  // Resolve the dynamic content target: prefer the adopted <main id="main">
+  // -------------------- Knowledge graph helpers (v0.4.c6.知识图谱) --------------------
+  // Build a graph from wikilinks + shared tags. Two entities are connected if:
+  //   - One has a wikilink to the other ([[type/slug]] or [[slug]])
+  //   - They share at least one tag
+  // Returns {nodes, edges, hubs} where hubs = entities sorted by degree.
+  function buildGraph(state) {
+    const e = state && state.entities;
+    if (!e) return { nodes: [], edges: [], hubs: [] };
+    const all = [];
+    for (const type of ['person', 'task', 'project', 'link']) {
+      for (const item of (e[type] || [])) {
+        all.push({ ...item, _type: type });
+      }
+    }
+    if (all.length === 0) return { nodes: [], edges: [], hubs: [] };
+    // Map of id -> entity for wikilink resolution
+    const byId = {};
+    const bySlug = {};
+    for (const it of all) {
+      byId[it.id] = it;
+      bySlug[`${it._type}/${it.slug}`] = it;
+      bySlug[it.slug] = it; // fallback: bare slug
+    }
+    const titleOf = (it) => (it.data && (it.data.title || it.data.name)) || it.slug;
+    const edges = new Map(); // "from|to" -> {reason}
+    const addEdge = (from, to, reason) => {
+      if (!from || !to || from.id === to.id) return;
+      const key = [from.id, to.id].sort().join('|');
+      if (!edges.has(key)) edges.set(key, { from: from.id, to: to.id, reasons: new Set() });
+      edges.get(key).reasons.add(reason);
+    };
+    // Wikilink edges
+    const wikiRe = /\[\[([^\]]+)\]\]/g;
+    for (const it of all) {
+      const body = it.body || '';
+      let m;
+      while ((m = wikiRe.exec(body)) !== null) {
+        const target = m[1].trim();
+        const resolved = bySlug[target];
+        if (resolved) addEdge(it, resolved, 'wikilink');
+      }
+    }
+    // Tag-overlap edges
+    const tagToEntities = {};
+    for (const it of all) {
+      for (const tag of (it.data && it.data.tags) || []) {
+        if (!tagToEntities[tag]) tagToEntities[tag] = [];
+        tagToEntities[tag].push(it);
+      }
+    }
+    for (const tag of Object.keys(tagToEntities)) {
+      const bucket = tagToEntities[tag];
+      if (bucket.length < 2) continue;
+      for (let i = 0; i < bucket.length; i++) {
+        for (let j = i + 1; j < bucket.length; j++) {
+          addEdge(bucket[i], bucket[j], `#${tag}`);
+        }
+      }
+    }
+    // Compute degree
+    const degree = {};
+    for (const it of all) degree[it.id] = 0;
+    for (const e of edges.values()) {
+      degree[e.from] = (degree[e.from] || 0) + 1;
+      degree[e.to] = (degree[e.to] || 0) + 1;
+    }
+    const hubs = all
+      .filter(it => degree[it.id] > 0)
+      .sort((a, b) => degree[b.id] - degree[a.id]);
+    // Build adjacency: for each entity, list of connected entities with reason labels
+    const adjacency = {};
+    for (const it of all) adjacency[it.id] = [];
+    for (const e of edges.values()) {
+      adjacency[e.from].push({ other: e.to, reasons: Array.from(e.reasons) });
+      adjacency[e.to].push({ other: e.from, reasons: Array.from(e.reasons) });
+    }
+    return { nodes: all, edges: Array.from(edges.values()), hubs, degree, adjacency, titleOf, byId };
+  }
+
+  function renderKnowledge(state) {
+    const g = buildGraph(state);
+    if (g.nodes.length === 0) {
+      return [
+        '<div class="cockpit-knowledge">',
+          '<div class="cockpit-knowledge-empty">',
+            icon('graph', 28),
+            '<h2>知识图谱还没有数据</h2>',
+            '<p>新建一个 entry 就会出现在这里。</p>',
+          '</div>',
+        '</div>'
+      ].join('');
+    }
+    const totalConnections = g.edges.length;
+    const connectedNodes = g.hubs.length;
+    // Hero
+    const hero = [
+      '<header class="cockpit-knowledge-hero">',
+        icon('graph', 24),
+        '<div>',
+          '<h1>知识图谱</h1>',
+          '<p>' + g.nodes.length + ' 个 entities · ' + totalConnections + ' 条连接 · ' + connectedNodes + ' 个有连接的节点</p>',
+        '</div>',
+      '</header>'
+    ].join('');
+    // Top hubs (top 5)
+    const topHubs = g.hubs.slice(0, 5);
+    const hubsHtml = topHubs.map(hub => {
+      const title = g.titleOf(hub);
+      const degree = g.degree[hub.id];
+      const connections = g.adjacency[hub.id].slice(0, 8);
+      const items = connections.map(c => {
+        const other = g.byId[c.other];
+        if (!other) return '';
+        const otherTitle = g.titleOf(other);
+        const reasons = c.reasons.slice(0, 2).join(', ');
+        return '<a class="cockpit-knowledge-edge" href="#/entity/' + esc(other.id) + '">' +
+          '<span class="cockpit-list-dot dot-' + esc(other._type) + '"></span>' +
+          '<span class="cockpit-knowledge-edge-title">' + esc(otherTitle) + '</span>' +
+          '<span class="cockpit-knowledge-edge-reason">' + esc(reasons) + '</span>' +
+        '</a>';
+      }).join('');
+      const more = g.adjacency[hub.id].length > 8
+        ? '<div class="cockpit-knowledge-more">+ ' + (g.adjacency[hub.id].length - 8) + ' 更多连接</div>'
+        : '';
+      return [
+        '<section class="cockpit-knowledge-hub">',
+          '<header class="cockpit-knowledge-hub-header">',
+            '<a class="cockpit-knowledge-hub-title" href="#/entity/' + esc(hub.id) + '">',
+              '<span class="cockpit-list-dot dot-' + esc(hub._type) + '"></span>',
+              esc(title),
+            '</a>',
+            '<span class="cockpit-knowledge-hub-degree">' + degree + ' 条连接</span>',
+          '</header>',
+          '<div class="cockpit-knowledge-edges">' + items + '</div>',
+          more,
+        '</section>'
+      ].join('');
+    }).join('');
+    // Type clusters
+    const byType = { person: 0, task: 0, project: 0, link: 0 };
+    for (const it of g.nodes) byType[it._type] = (byType[it._type] || 0) + 1;
+    const clusterHtml = [
+      '<section class="cockpit-knowledge-clusters">',
+        '<h2>类型分布</h2>',
+        '<div class="cockpit-knowledge-cluster-grid">',
+          ['person', 'task', 'project', 'link'].map(t => {
+            const labels = { person: '人物', task: '任务', project: '项目', link: '链接' };
+            const n = byType[t] || 0;
+            return '<div class="cockpit-knowledge-cluster cluster-' + t + '">' +
+              '<span class="cockpit-knowledge-cluster-label">' + esc(labels[t]) + '</span>' +
+              '<span class="cockpit-knowledge-cluster-count">' + n + '</span>' +
+            '</div>';
+          }).join(''),
+        '</div>',
+      '</section>'
+    ].join('');
+    const main = connectedNodes === 0
+      ? '<div class="cockpit-knowledge-empty"><p>没有任何连接。在 entry 里用 <code>[[type/slug]]</code> 互相引用,或者共享标签就能建图。</p></div>'
+      : '<div class="cockpit-knowledge-hubs">' + hubsHtml + '</div>';
+    return [
+      '<div class="cockpit-knowledge">',
+        hero,
+        clusterHtml,
+        main,
+      '</div>'
+    ].join('');
+  }
+
+    // Resolve the dynamic content target: prefer the adopted <main id="main">
   // (so v3 renderers like __renderTasks can write to #main.innerHTML).
   // Fall back to #cockpit-content for first-paint before adoption completes.
   function renderTarget() {
@@ -1041,6 +1209,10 @@
       }
       if (route === 'review') {
         content.innerHTML = renderReview(state);
+        return;
+      }
+      if (route === 'knowledge') {
+        content.innerHTML = renderKnowledge(state);
         return;
       }
       const map = [].concat(NAV_PRIMARY, NAV_RESOURCES).reduce((m, it) => (m[it.impl] = it.label, m), {});
