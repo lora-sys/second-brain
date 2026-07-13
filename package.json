@@ -13,7 +13,8 @@
     "tauri": "cargo tauri",
     "check": "node --check server.mjs && node --check lib/*.mjs && node --check lib/llm/*.mjs",
     "check:tauri": "cd src-tauri && cargo check",
-    "test:e2e": "playwright-cli run-code --filename recordings/e2e-demo.mjs"
+    "test:e2e": "playwright-cli run-code --filename recordings/e2e-demo.mjs",
+    "test:e2e:cockpit": "node server.mjs & sleep 2 && playwright-cli open && playwright-cli run-code --filename tests/e2e/cockpit.mjs; kill %1 2>/dev/null"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
