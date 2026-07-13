@@ -24,6 +24,7 @@ _Last updated: 2026-07-12 by @coordinator_
 | #v0.4.4.x | vault_read / vault_create / vault_update / vault_delete / config_set / vault_search / links_import | Tauri | @coordinator | (follow-ups) | Backlog |
 | #v0.4.5 | Frontend rewire (config_get + vault_list_all → invoke) | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.6 | Tauri build pipeline + GitHub Actions + AppImage | Tauri | @coordinator | (next round) | Planning |
+| #v0.4.c3 | Cockpit today panel (感悟/成就/关注) | Cockpit UI | @coordinator | merged | ✅ Done |
 
 ## Backlog (v0.4, in dependency order)
 
@@ -78,6 +79,7 @@ _None._
 
 | PR | Title | Evidence |
 |---|---|---|
+| `538b6d4` | docs: memory updates for v0.4.c3 | (in v0.4.c3 evidence) |
 | `4cf242a` | docs: memory updates for v0.4.5 | (in v0.4.5 evidence) |
 | (pending) | feat(bridge): v0.4.5 frontend rewire | [docs/evidence/v0.4.5/](evidence/v0.4.5/) |
 | `3611244` | feat(tauri): v0.4.4 vault commands (config_get + vault_list_all) | [docs/evidence/v0.4.4/](evidence/v0.4.4/) |
