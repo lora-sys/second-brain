@@ -118,3 +118,12 @@
 - **Slug collision handling** — append `-2`, `-3`, etc. up to 100 retries. Real-world users hit this when they create multiple "Buy milk" tasks.
 - **EnvGuard RAII pattern for env-var tests** — Drop restores the env var even if the test panics. Replaces the panic-prone `let prev = ...; set_var; ...; match prev { restore }` pattern. Also makes the lock acquisition obvious (just `let _lock = ENV_LOCK.lock()...` at the top).
 - **Parallel test race on `std::env::set_var` in Rust 1.97** — `set_var` is now `unsafe` because the stdlib doesn't synchronize. A mutex around the test is required; my first attempt had only my new tests using the mutex, and the old `set_var` calls in pre-existing tests were racing with my new tests' env reads. Fixed by adding the mutex to ALL env-var tests.
+
+## 2026-07-13 (v0.4.4.x++ vault_update + vault_delete landed)
+
+- **vault_update Rust command shipped** — read existing frontmatter → merge with new data → atomic write. Patch semantics (unspecified keys preserved), not replace. Always bumps 'updated'. 5th Tauri command.
+- **vault_delete with trash support** — 6th Tauri command. trash:false → unlink; trash:true → rename to <vault>/.trash/<slug>-<ts>.md. Default to hard delete (matches Node server's behavior).
+- **CRUD complete in Rust** — the Tauri desktop app can now read (config_get, vault_list_all, vault_read), create (vault_create), update (vault_update), delete (vault_delete). All entity operations work without the Node HTTP server.
+- **27/27 tests pass in parallel** — added 6 tests for the new commands. ENV_LOCK mutex + EnvGuard RAII pattern continues to keep env-var tests stable.
+- **Frontend bridge extended** — api.update and api.delete now invoke-first with fetch fallback. Same pattern as vault_create.
+- **Test reliability proven** — 5 consecutive parallel `cargo test` runs all 27/27 pass, zero flakes. The ENV_LOCK mutex + EnvGuard + env-var-aware helpers finally nailed the parallel-test race.

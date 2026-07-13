@@ -89,3 +89,10 @@
 - **Test pass count != test reliability** — 21/21 passing on a single run can mask flakiness. Run the test 5+ times. If it's flaky, you'll see the failures.
 - **Custom date math is fine for one shot** — the proleptic Gregorian algorithm is ~30 lines and well-known. If you find yourself writing the third date conversion, pull in `chrono`. Until then, the dep cost isn't worth it.
 - **Atomic write pattern is universal** — `write to .tmp-*, rename to final` works on every filesystem that has atomic rename (POSIX guarantees it within a filesystem; on Windows it works if both paths are on the same volume). The cost is one stale `.tmp-*` file per crashed write — easy to clean up in next write or sweep.
+
+## v0.4.4.x++ (vault_update + vault_delete)
+
+- **"Patch" vs "Replace" semantics for vault_update** — read existing → merge → write. The caller doesn't have to send all fields. This is friendlier for the frontend (the entity editor only sends changed fields) and friendlier for the user (no accidental data loss on partial updates).
+- **`trash: Option<bool>` is better than `trash: bool` for Tauri commands** — Tauri's serde deserialization treats `None` as missing JSON. `Option<bool>` makes the parameter optional (defaults to `false` via `unwrap_or(false)`). Avoids the caller having to send `trash: false` explicitly.
+- **Trash filename pattern** — `<slug>-<iso8601>.md` is sortable, unique, and human-readable. The .md extension is preserved so tools that glob .md files (like our own vault_list_all) don't accidentally try to read trash files as entities. Trash is at `<vault>/.trash/` so it's outside the entity directories — it won't show up in vault_list_all.
+- **Test count =/= test reliability** — went from 14 → 21 → 27 tests. Each addition had to keep the parallel-test race fixed. The pattern: ENV_LOCK + EnvGuard + canonicalized path checks. Once that's in place, adding more env-var tests is mechanical.
