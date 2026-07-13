@@ -12,12 +12,15 @@
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
 
+  // v0.4.6: state moved to public/lib/state.js (window.__state)
+  const { state } = window.__state;
+
   const NAV_PRIMARY = [
     { hash: '#/dashboard', label: '今日', icon: 'home', impl: 'dashboard' },
     { hash: '#/notes', label: '笔记库', icon: 'note', impl: 'soon' },
     { hash: '#/knowledge', label: '知识图谱', icon: 'graph', impl: 'soon' },
     { hash: '#/tasks', label: '任务', icon: 'check', impl: 'tasks' },
-    { hash: '#/schedule', label: '日程', icon: 'calendar', impl: 'soon' },
+    { hash: '#/schedule', label: '日程', icon: 'calendar', impl: 'schedule' },
     { hash: '#/review', label: '回顾', icon: 'eye', impl: 'soon' },
   ];
   const NAV_RESOURCES = [
@@ -284,6 +287,108 @@
     ].join('');
   }
 
+    // -------------------- Schedule helpers (v0.4.c6) --------------------
+  function scheduleBuckets(state) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dayMs = 86400000;
+    const tomorrow = new Date(today.getTime() + dayMs);
+    const weekEnd = new Date(today.getTime() + 7 * dayMs);
+    const buckets = { overdue: [], today: [], tomorrow: [], thisWeek: [], later: [] };
+    const push = (item, date) => {
+      const d = parseDateOnly(date);
+      if (!d) return;
+      if (d < today) buckets.overdue.push({ item, d });
+      else if (d.getTime() === today.getTime()) buckets.today.push({ item, d });
+      else if (d.getTime() === tomorrow.getTime()) buckets.tomorrow.push({ item, d });
+      else if (d < weekEnd) buckets.thisWeek.push({ item, d });
+      else buckets.later.push({ item, d });
+    };
+    const e = state && state.entities;
+    if (e) {
+      for (const t of (e.task || [])) {
+        if (t.data && t.data.due) push(t, t.data.due);
+      }
+      for (const p of (e.project || [])) {
+        if (p.data && (p.data.deadline || p.data.due)) push(p, p.data.deadline || p.data.due);
+      }
+    }
+    for (const k of Object.keys(buckets)) buckets[k].sort((a, b) => a.d - b.d);
+    return buckets;
+  }
+  function fmtDayLabel(d, today) {
+    const dayMs = 86400000;
+    const diff = Math.round((d - today) / dayMs);
+    if (diff < 0) return '已逾期 ' + (-diff) + ' 天';
+    if (diff === 0) return '今天';
+    if (diff === 1) return '明天';
+    if (diff < 7) return diff + ' 天后';
+    return d.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+  }
+  function renderSchedule(state) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const buckets = scheduleBuckets(state);
+    const sections = [
+      { key: 'overdue', label: '已逾期', accent: 'danger' },
+      { key: 'today', label: '今天', accent: 'accent' },
+      { key: 'tomorrow', label: '明天', accent: 'soft' },
+      { key: 'thisWeek', label: '本周内', accent: 'soft' },
+      { key: 'later', label: '之后', accent: 'faint' },
+    ];
+    const totalCount = Object.values(buckets).reduce((s, b) => s + b.length, 0);
+    if (totalCount === 0) {
+      return [
+        '<div class="cockpit-schedule">',
+          '<div class="cockpit-schedule-empty">',
+            icon('calendar', 28),
+            '<h2>还没有日程</h2>',
+            '<p>给 task 加 <code>due: 2026-01-01</code>、给 project 加 <code>deadline: 2026-01-01</code> 就会出现。</p>',
+          '</div>',
+        '</div>'
+      ].join('');
+    }
+    const sectionHtml = sections.map(s => {
+      const items = buckets[s.key];
+      if (items.length === 0) return '';
+      const itemsHtml = items.map(({ item, d }) => {
+        const isTask = item.type === 'task' || (item.data && item.data.type === 'task');
+        const dotClass = d < today ? 'dot-task-overdue' : (isTask ? 'dot-task-overdue' : 'dot-project');
+        const title = item.title || item.slug;
+        const type = item.type || (item.data && item.data.type) || '';
+        const status = item.data && item.data.status;
+        const isDone = status === 'done' || status === '已完成';
+        return [
+          '<li class="cockpit-schedule-item' + (isDone ? ' is-done' : '') + '">',
+            '<span class="cockpit-list-dot ' + dotClass + '"></span>',
+            '<span class="cockpit-schedule-day">' + esc(fmtDayLabel(d, today)) + '</span>',
+            '<span class="cockpit-schedule-title">' + esc(title) + '</span>',
+            type ? '<span class="cockpit-schedule-type">' + esc(type) + '</span>' : '',
+          '</li>'
+        ].join('');
+      }).join('');
+      return [
+        '<section class="cockpit-schedule-section accent-' + s.accent + '">',
+          '<header class="cockpit-schedule-header">',
+            '<h2 class="cockpit-schedule-title">' + esc(s.label) + '</h2>',
+            '<span class="cockpit-schedule-count">' + items.length + '</span>',
+          '</header>',
+          '<ul class="cockpit-schedule-list">' + itemsHtml + '</ul>',
+        '</section>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="cockpit-schedule">',
+        '<header class="cockpit-schedule-hero">',
+          icon('calendar', 24),
+          '<div>',
+            '<h1>日程</h1>',
+            '<p>' + totalCount + ' 项即将到来或逾期。聚焦最近 7 天，更远的在"之后"。</p>',
+          '</div>',
+        '</header>',
+        sectionHtml,
+      '</div>'
+    ].join('');
+  }
+
     function renderTodayPanel() {
     const state = (window.__appState) || { entities: { person: [], task: [], project: [], link: [] } };
     const reflection = pickReflection(state);
@@ -495,6 +600,10 @@
       }
       if (route === 'tasks') { if (window.__renderTasks) await window.__renderTasks(); return; }
       if (route === 'links') { if (window.__renderLinks) await window.__renderLinks(); return; }
+      if (route === 'schedule') {
+        content.innerHTML = renderSchedule(state);
+        return;
+      }
       if (route === 'tags') {
         if (window.__refreshCounts) { try { await window.__refreshCounts(); } catch {} }
         content.insertAdjacentHTML('beforeend',

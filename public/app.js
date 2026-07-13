@@ -1813,6 +1813,16 @@
     await window.__cockpit.renderContent(impl, hash);
   }
 
+  window.__appRouteImpl = (route) => {
+    if (!route || route === 'dashboard' || route === '') return 'dashboard';
+    if (route === 'tasks') return 'tasks';
+    if (route === 'resources') return 'links';
+    if (route === 'links') return 'links';
+    if (route === 'people' || route === 'projects') return 'soon';
+    if (route === 'tags') return 'tags';
+    if (route === 'schedule') return 'schedule';
+    return 'soon';
+  };
   function routeImplFor(route) {
     if (!route || route === 'dashboard' || route === '') return 'dashboard';
     if (route === 'tasks') return 'tasks';
@@ -1820,6 +1830,7 @@
     if (route === 'links') return 'links';
     if (route === 'people' || route === 'projects') return 'soon';
     if (route === 'tags') return 'tags';
+    if (route === 'schedule') return 'schedule';
     return 'soon';
   }
 
@@ -1840,8 +1851,14 @@
         const buckets = { person: [], task: [], project: [], link: [] };
         for (const it of items) (buckets[it.type] || buckets.link).push(it);
         state.entities = buckets;
+        // Re-render with the current route, not hardcoded 'dashboard'.
+        // Otherwise navigating to /#/schedule before entities load would
+        // be silently flipped back to dashboard.
         if (window.__cockpit && window.__cockpit.renderContent) {
-          window.__cockpit.renderContent('dashboard', '#/dashboard');
+          const hash = location.hash || '#/dashboard';
+          const route = hash.replace('#/', '').split('?')[0];
+          const impl = (window.__appRouteImpl || ((r) => 'dashboard'))(route);
+          window.__cockpit.renderContent(impl, hash);
         }
       }).catch((e) => console.warn('[app] entity pre-load failed:', e.message));
     }
