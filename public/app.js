@@ -106,7 +106,24 @@
       return api.get(type ? `/api/entities?type=${type}` : '/api/entities').then(d => d.items);
     },
     read: (id) => invokeOrFetch('vault_read', { id }, `/api/entities/${encodeURIComponent(id)}`),
-    create: (body) => api.post('/api/entities', body),
+    create: (body) => {
+      // Tauri: invoke('vault_create', { entity_type, title, body, data })
+      // Browser: POST /api/entities
+      if (tauri) {
+        return invokeOrFetch(
+          'vault_create',
+          {
+            entity_type: body && body.type,
+            title: body && (body.title || body.name),
+            body: body && (body.body || ''),
+            data: body && body.data,
+          },
+          '/api/entities',
+          { method: 'POST', body: JSON.stringify(body || {}) }
+        );
+      }
+      return api.post('/api/entities', body);
+    },
     update: (id, body) => api.put(`/api/entities/${encodeURIComponent(id)}`, body),
     delete: (id) => api.del(`/api/entities/${encodeURIComponent(id)}`),
     search: (q) => api.get(`/api/search?q=${encodeURIComponent(q)}`),

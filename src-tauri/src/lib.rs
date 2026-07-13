@@ -259,6 +259,161 @@ fn vault_list_all() -> Result<Vec<Entity>, String> {
     Ok(entities)
 }
 
+#[tauri::command]
+fn vault_create(
+    entity_type: String,
+    title: String,
+    body: String,
+    data: Option<serde_json::Value>,
+) -> Result<Entity, String> {
+    let valid_types = ["person", "task", "project", "link"];
+    if !valid_types.contains(&entity_type.as_str()) {
+        return Err(format!("invalid type: {entity_type}"));
+    }
+    if title.trim().is_empty() {
+        return Err("title is required".to_string());
+    }
+    let cfg = config_get().map_err(|e| format!("config: {e}"))?;
+    let dir_name = cfg
+        .directories
+        .get(&entity_type)
+        .cloned()
+        .ok_or_else(|| format!("no directory configured for type {entity_type}"))?;
+    let vault_root = std::path::PathBuf::from(&cfg.vault_path);
+    let dir = vault_root.join(&dir_name);
+    std::fs::create_dir_all(&dir).map_err(|e| format!("create dir {}: {}", dir.display(), e))?;
+
+    let base_slug = slugify(&title);
+    let mut slug = base_slug.clone();
+    let mut counter = 1;
+    while dir.join(format!("{slug}.md")).exists() {
+        counter += 1;
+        slug = format!("{base_slug}-{counter}");
+        if counter > 100 {
+            return Err(format!("too many collisions for slug base '{base_slug}'"));
+        }
+    }
+
+    let now = chrono_like_now();
+    let mut fm = serde_json::Map::new();
+    if let Some(serde_json::Value::Object(obj)) = data.clone() {
+        for (k, v) in obj {
+            fm.insert(k, v);
+        }
+    }
+    fm.entry("title".to_string()).or_insert(serde_json::Value::String(title.clone()));
+    fm.entry("type".to_string()).or_insert(serde_json::Value::String(entity_type.clone()));
+    fm.insert("created".to_string(), serde_json::Value::String(now.clone()));
+    fm.insert("updated".to_string(), serde_json::Value::String(now));
+    let yaml = serde_yaml::to_string(&serde_json::Value::Object(fm))
+        .map_err(|e| format!("yaml serialize: {e}"))?;
+
+    let body_normalized = if body.is_empty() { String::new() } else { format!("\n{}\n", body.trim_end_matches('\n')) };
+    let file_content = format!("---\n{yaml}---\n{body_normalized}");
+
+    let file_path = dir.join(format!("{slug}.md"));
+    let lock = acquire_dir_lock(&dir).map_err(|e| format!("lock {}: {}", dir.display(), e))?;
+    let write_result = (|| -> Result<(), String> {
+        let tmp = dir.join(format!(".tmp-{}-{}", std::process::id(), slug));
+        std::fs::write(&tmp, file_content.as_bytes()).map_err(|e| format!("write {}: {}", tmp.display(), e))?;
+        std::fs::rename(&tmp, &file_path).map_err(|e| format!("rename {}: {}", tmp.display(), e))?;
+        Ok(())
+    })();
+    release_dir_lock(lock);
+    write_result?;
+
+    Ok(Entity {
+        id: format!("{dir_name}/{slug}"),
+        r#type: entity_type,
+        slug,
+        title,
+        data: serde_json::Value::Object(
+            serde_yaml::from_str::<serde_json::Value>(&yaml)
+                .ok()
+                .and_then(|v| v.as_object().cloned())
+                .unwrap_or_default()
+        ),
+        body: body_normalized,
+        path: file_path.display().to_string(),
+    })
+}
+
+/// Minimal slugify: lowercase, replace whitespace with -, strip non-alphanumeric
+/// (Unicode letters/digits allowed), collapse multiple -, trim leading/trailing -,
+/// cap at 80 chars. Mirrors lib/frontmatter.mjs slugify.
+fn slugify(input: &str) -> String {
+    let mut s = String::new();
+    let mut prev_dash = false;
+    for c in input.trim().chars() {
+        let mapped = if c.is_whitespace() { '-' } else if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' };
+        if mapped == '-' {
+            if !prev_dash && !s.is_empty() {
+                s.push('-');
+                prev_dash = true;
+            }
+        } else {
+            s.push(mapped);
+            prev_dash = false;
+        }
+    }
+    let trimmed = s.trim_matches('-').to_string();
+    if trimmed.is_empty() { "untitled".to_string() } else { trimmed.chars().take(80).collect() }
+}
+
+/// ISO-ish timestamp without bringing in chrono: use std::time.
+fn chrono_like_now() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let days = (secs / 86400) as i64;
+    let rem = (secs % 86400) as i64;
+    let h = rem / 3600;
+    let m = (rem % 3600) / 60;
+    let s = rem % 60;
+    let (y, mo, d) = days_to_ymd(days);
+    format!("{y:04}-{mo:02}-{d:02}T{h:02}:{m:02}:{s:02}Z")
+}
+
+/// Convert days-since-epoch (1970-01-01) to (year, month, day) using the
+/// proleptic Gregorian calendar. No external deps.
+fn days_to_ymd(days: i64) -> (i32, u32, u32) {
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u32;
+    let yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
+    let y = yoe as i32 + era as i32 * 400;
+    let doy = doe - (365 * yoe + yoe/4 - yoe/100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
+}
+
+fn acquire_dir_lock(dir: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    let lock_path = dir.join(".sb-lock");
+    for _ in 0..50 {
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock_path)
+        {
+            Ok(_) => return Ok(lock_path),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            Err(e) => return Err(format!("open {}: {}", lock_path.display(), e)),
+        }
+    }
+    Err(format!("could not acquire lock {}", lock_path.display()))
+}
+
+fn release_dir_lock(lock_path: std::path::PathBuf) {
+    let _ = std::fs::remove_file(&lock_path);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -273,7 +428,7 @@ pub fn run() {
             log::info!("second-brain v{} starting", env!("CARGO_PKG_VERSION"));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![config_get, vault_list_all, vault_read])
+        .invoke_handler(tauri::generate_handler![config_get, vault_list_all, vault_read, vault_create])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
@@ -286,6 +441,33 @@ pub fn run() {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    // Tests that touch the SECOND_BRAIN_CONFIG env var must run serially
+    // because env vars are process-wide. Without this mutex, parallel tests
+    // race on each other's env mutations.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Guard that temporarily sets an env var and restores it on Drop.
+    /// Eliminates the "panic before restore" footgun.
+    struct EnvGuard {
+        key: &'static str,
+        prev: Option<String>,
+    }
+    impl EnvGuard {
+        fn set(key: &'static str, val: &std::path::Path) -> Self {
+            let prev = std::env::var(key).ok();
+            std::env::set_var(key, val);
+            EnvGuard { key, prev }
+        }
+    }
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            match self.prev.as_ref() {
+                Some(v) => std::env::set_var(self.key, v),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
 
     #[test]
     fn parse_frontmatter_basic() {
@@ -330,6 +512,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let cfg_path = dir.path().join("config.json");
         std::fs::File::create(&cfg_path).expect("create").write_all(b"{}").expect("write");
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
         std::env::set_var("SECOND_BRAIN_CONFIG", &cfg_path);
         let found = find_config();
@@ -376,6 +559,7 @@ mod tests {
         );
         std::fs::write(&cfg_path, cfg_json).unwrap();
 
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
         std::env::set_var("SECOND_BRAIN_CONFIG", &cfg_path);
 
@@ -404,6 +588,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let cfg_path = dir.path().join("config.json");
         std::fs::write(&cfg_path, r#"{"vaultPath":"/tmp/fake"}"#).unwrap();
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
         std::env::set_var("SECOND_BRAIN_CONFIG", &cfg_path);
 
@@ -418,6 +603,158 @@ mod tests {
         assert!(cfg.port.is_none());
         assert!(cfg.host.is_none());
         assert!(cfg.directories.is_empty());
+    }
+
+    #[test]
+    fn slugify_basic() {
+        assert_eq!(slugify("Hello World"), "hello-world");
+        assert_eq!(slugify("  多个  空格  "), "多个-空格");
+        assert_eq!(slugify("  ?? weird ?? "), "weird");
+        assert_eq!(slugify(""), "untitled");
+        assert_eq!(slugify("---"), "untitled");
+        assert_eq!(slugify("a/b/c"), "a-b-c");
+    }
+
+    #[test]
+    fn vault_create_writes_file() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        let tasks = vault.join("20-Tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"task":"20-Tasks"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let result = vault_create(
+            "task".to_string(),
+            "Buy milk".to_string(),
+            "At the corner store.".to_string(),
+            None,
+        );
+        let entity = result.expect("vault_create ok");
+        assert_eq!(entity.title, "Buy milk");
+        assert_eq!(entity.slug, "buy-milk");
+        assert_eq!(entity.r#type, "task");
+        assert_eq!(entity.id, "20-Tasks/buy-milk");
+        let file_path = tasks.join("buy-milk.md");
+        assert!(file_path.exists());
+        let raw = std::fs::read_to_string(&file_path).unwrap();
+        assert!(raw.starts_with("---\n"));
+        assert!(raw.contains("title: Buy milk"));
+        assert!(raw.contains("type: task"));
+        assert!(raw.contains("At the corner store."));
+    }
+
+    #[test]
+    fn vault_create_with_extra_data() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let extra = serde_json::json!({"priority": "high", "tags": ["friend"]});
+        let result = vault_create(
+            "person".to_string(),
+            "Alice".to_string(),
+            "".to_string(),
+            Some(extra),
+        );
+        let entity = result.expect("vault_create ok");
+        assert_eq!(entity.slug, "alice");
+        let raw = std::fs::read_to_string(vault.join("10-People").join("alice.md")).unwrap();
+        assert!(raw.contains("priority: high"));
+        assert!(raw.contains("tags:"));
+        assert!(raw.contains("- friend"));
+    }
+
+    #[test]
+    fn vault_create_handles_slug_collision() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let e1 = vault_create("person".to_string(), "Alice".to_string(), "".to_string(), None).unwrap();
+        let e2 = vault_create("person".to_string(), "Alice".to_string(), "".to_string(), None).unwrap();
+        let e3 = vault_create("person".to_string(), "Alice".to_string(), "".to_string(), None).unwrap();
+        assert_eq!(e1.slug, "alice");
+        assert_eq!(e2.slug, "alice-2");
+        assert_eq!(e3.slug, "alice-3");
+        assert!(vault.join("10-People").join("alice.md").exists());
+        assert!(vault.join("10-People").join("alice-2.md").exists());
+        assert!(vault.join("10-People").join("alice-3.md").exists());
+    }
+
+    #[test]
+    fn vault_create_rejects_invalid_type() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(&vault).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let result = vault_create("monster".to_string(), "x".to_string(), "".to_string(), None);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("invalid type"), "got: {err}");
+    }
+
+    #[test]
+    fn vault_create_rejects_empty_title() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(&vault).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"task":"20-Tasks"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        let result = vault_create("task".to_string(), "   ".to_string(), "".to_string(), None);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("title"), "got: {err}");
+    }
+
+    #[test]
+    fn vault_create_atomic_no_tmp_files_left() {
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = dir.path().join("vault");
+        std::fs::create_dir_all(vault.join("10-People")).unwrap();
+        let cfg_path = dir.path().join("config.json");
+        std::fs::write(
+            &cfg_path,
+            format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
+        ).unwrap();
+        let _env = EnvGuard::set("SECOND_BRAIN_CONFIG", &cfg_path);
+        vault_create("person".to_string(), "Bob".to_string(), "".to_string(), None).unwrap();
+        let people = vault.join("10-People");
+        let lock = people.join(".sb-lock");
+        assert!(!lock.exists(), "lock file should be released after write");
+        let stray_tmp: Vec<_> = std::fs::read_dir(&people).unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().starts_with(".tmp-"))
+            .collect();
+        assert!(stray_tmp.is_empty(), "no tmp files should remain");
     }
 
     #[test]
@@ -458,6 +795,7 @@ mod tests {
             &cfg_path,
             format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
         ).unwrap();
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
         std::env::set_var("SECOND_BRAIN_CONFIG", &cfg_path);
         let result = vault_read("10-People/alice".to_string());
@@ -484,6 +822,7 @@ mod tests {
             &cfg_path,
             format!(r#"{{"vaultPath":"{}","directories":{{"person":"10-People"}}}}"#, vault.display()),
         ).unwrap();
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
         std::env::set_var("SECOND_BRAIN_CONFIG", &cfg_path);
         let result = vault_read("10-People/nonexistent".to_string());
@@ -509,6 +848,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         // Point SECOND_BRAIN_CONFIG at a path that does NOT exist.
         let nonexistent = dir.path().join("does-not-exist.json");
+        let _lock = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let prev_env = std::env::var("SECOND_BRAIN_CONFIG").ok();
         std::env::set_var("SECOND_BRAIN_CONFIG", &nonexistent);
         let result = config_get();
