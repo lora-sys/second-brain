@@ -83,3 +83,11 @@
 - **Rust Config serialized as camelCase** — added `#[serde(rename_all = "camelCase")]`. Bug caught by Tauri-sim test: state.config.vaultPath was undefined in Tauri mode because Rust returned snake_case `vault_path`. Without the Tauri-sim test this would have shipped broken.
 - **Tauri-sim test pattern** — inject a mock `window.__TAURI__` via Playwright's `addInitScript`, capture `window.__invokeLog` to verify which commands actually got invoked. This pattern is reusable for v0.4.7 (full E2E) and for any future bridge test.
 - **`vault_list_all` returns Vec directly, JS wraps in {items}** — small shape adapter in `normalizeTauri`. v0.4.4 already returned Vec, JS expected {items: [...]}. Adapter is one line.
+
+## 2026-07-13 (v0.4.c3 cockpit today panel landed)
+
+- **Cockpit today panel shipped** (commit pending merge) — 3 blocks: 感悟 / 成就 / 关注. Self-contained, doesn't share rendering with v0.3 dashboard.
+- **Refreshcounts made fire-and-forget in cockpitRoute** — the today panel computes from state.entities; awaiting /api/dashboard was blocking the panel render. The standard v0.3 boot still uses the awaited refreshCounts because it actually needs dashboard aggregates.
+- **Entities pre-loaded in bootCockpit** — `api.list()` runs after config.get(); when entities arrive, re-render the today panel so it has real data.
+- **Found and fixed a latent crash in server.mjs** — `(a.data.due || '').localeCompare(...)` blew up when js-yaml parsed `due: 2026-07-12` as a Date object (bare ISO timestamps are auto-parsed). Without this fix, /api/dashboard returned 500 and EVERY consumer (cockpit + standard) showed the spinner forever. Wrapped with `String(...)` coercion.
+- **Vocab mismatch surfaced** — tasks with `status: open` or `doing` aren't counted in tasksByStatus because the server checks for `todo`/`in_progress`. Filed as v0.4.c3 polish.

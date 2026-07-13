@@ -1922,9 +1922,9 @@
     const hash = location.hash || '#/dashboard';
     const route = hash.replace('#/', '').split('?')[0];
     const impl = routeImplFor(route);
-    try {
-      await window.__refreshCounts();
-    } catch {}
+    if (window.__refreshCounts) {
+      window.__refreshCounts().catch((e) => console.warn('[app] refreshCounts failed:', e.message));
+    }
     await window.__cockpit.renderContent(impl, hash);
   }
 
@@ -1949,14 +1949,31 @@
     } catch (err) {
       toast('加载配置失败：' + err.message, 'error');
     }
+    // Pre-load entities so the cockpit today panel has data to render.
+    if (api.list) {
+      api.list().then((items) => {
+        const buckets = { person: [], task: [], project: [], link: [] };
+        for (const it of items) (buckets[it.type] || buckets.link).push(it);
+        state.entities = buckets;
+        if (window.__cockpit && window.__cockpit.renderContent) {
+          window.__cockpit.renderContent('dashboard', '#/dashboard');
+        }
+      }).catch((e) => console.warn('[app] entity pre-load failed:', e.message));
+    }
     if (window.__cockpit) {
+      console.log('[app] calling renderShell');
       window.__cockpit.renderShell();
       if (window.__cockpit.refreshVaultName) window.__cockpit.refreshVaultName();
+      console.log('[app] renderShell done');
+    } else {
+      console.warn('[app] __cockpit not defined!');
     }
     window.removeEventListener('hashchange', handleRoute);
     window.addEventListener('hashchange', cockpitRoute);
     if (!location.hash) location.hash = '#/dashboard';
+    console.log('[app] calling cockpitRoute, hash=', location.hash);
     await cockpitRoute();
+    console.log('[app] bootCockpit END');
   };
   // ============================ Bootstrap =============================
   async function boot() {

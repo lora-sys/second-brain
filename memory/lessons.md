@@ -65,3 +65,11 @@
 - **Snake_case vs camelCase is a real cross-language trap** — Rust structs default to snake_case serialization; JS code usually reads camelCase. Add `#[serde(rename_all = "camelCase")]` on every DTO that crosses the JS boundary, or be prepared to translate in JS. The bug only shows up when you actually exercise the bridge end-to-end — a unit test on each side doesn't catch it.
 - **Bridge pattern: invoke-or-fetch with shape adapter** — when a single API method might be served by either Rust or fetch (depending on whether we're in Tauri), a wrapper that tries invoke first, falls back on error, and normalizes shape is simpler than two parallel methods. The trade-off is silent fallback on invoke errors; log a warn so dev tools can see.
 - **Tauri init script timing matters** — set up the mock BEFORE `goto()`. If you set it after, the SPA has already loaded with `__TAURI__` undefined and the bridge has already decided to use fetch.
+
+## v0.4.c3 (cockpit today panel)
+
+- **js-yaml auto-parses bare ISO timestamps as Date objects** — `due: 2026-07-12` becomes a Date, not a string. Then `.localeCompare` crashes. Always wrap date fields from frontmatter with `String(...)` before string operations, or use a YAML schema that disables timestamp parsing (`yaml.FAILSAFE_SCHEMA`).
+- **`await refreshCounts()` blocks the next thing in the chain** — when refreshCounts is in a different domain (slow dashboard fetch, unrelated to current panel's needs), it shouldn't gate render. Fire-and-forget with `.catch()` for logs.
+- **Cockpit mode needs its own entity fetch** — standard v0.3 boot doesn't fetch entities on boot (the dashboard panel computes from `state.counts` which is set by /api/dashboard). For cockpit today panel we need state.entities populated immediately, so we fire api.list() and re-render when it arrives.
+- **A latent crash in /api/dashboard hid behind test data shape** — the localeCompare bug existed since v0.3 (line 205), but only surfaced when test data had bare-date `due:` fields. Bug-hunting found it via Playwright console errors during the c3 verification.
+- **Always run regression check after panel changes** — v0.4.c3 changed renderContent's dashboard branch (replaced __renderDashboard with renderTodayPanel). Could have broken standard v0.3 boot. Tested both modes — standard still works.
