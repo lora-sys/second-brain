@@ -44,6 +44,9 @@
     star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
     trophy: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 4h2a2 2 0 0 1 2 2v1a4 4 0 0 1-4 4M7 4H5a2 2 0 0 0-2 2v1a4 4 0 0 0 4 4"/>',
     target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+    bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y1="10"/>',
   };
 
   // -------------------- Today helpers (v0.4.c3) --------------------
@@ -99,7 +102,104 @@
       })
       .slice(0, 5);
   }
-  function renderTodayPanel() {
+  // -------------------- Right rail helpers (v0.4.c4) --------------------
+  function parseDateOnly(s) {
+    if (!s) return null;
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function activeTasks(state) {
+    const tasks = (state && state.entities && state.entities.task) || [];
+    return tasks
+      .filter((t) => {
+        const s = (t.data && t.data.status) || '';
+        return s !== 'done' && s !== '已完成' && s !== 'cancelled' && s !== '已取消';
+      })
+      .sort((a, b) => {
+        // overdue first, then by due date
+        const ad = parseDateOnly(a.data && a.data.due) || Infinity;
+        const bd = parseDateOnly(b.data && b.data.due) || Infinity;
+        return ad - bd;
+      })
+      .slice(0, 6);
+  }
+  function upcomingTasks(state) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const horizon = new Date(today.getTime() + 7 * 86400000);
+    const tasks = (state && state.entities && state.entities.task) || [];
+    return tasks
+      .map((t) => {
+        const d = parseDateOnly(t.data && t.data.due);
+        return d ? { t, d } : null;
+      })
+      .filter((x) => x && x.d >= today && x.d <= horizon)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 6)
+      .map((x) => x.t);
+  }
+  function priorityBadge(p) {
+    const k = String(p || '').toLowerCase();
+    if (k === 'high' || k === '高') return { label: '高', cls: 'priority-high' };
+    if (k === 'low' || k === '低') return { label: '低', cls: 'priority-low' };
+    return null;
+  }
+  function renderRightRail(state) {
+    const active = activeTasks(state);
+    const upcoming = upcomingTasks(state);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dayMs = 86400000;
+    const fmtDue = (s) => {
+      const d = parseDateOnly(s);
+      if (!d) return '';
+      const diff = Math.round((d - today) / dayMs);
+      if (diff < 0) return '逾期 ' + (-diff) + ' 天';
+      if (diff === 0) return '今天';
+      if (diff === 1) return '明天';
+      return diff + ' 天后';
+    };
+    const activeHtml = active.length
+      ? `<ul class="cockpit-list">${active.map((t) => {
+          const pr = priorityBadge(t.data && t.data.priority);
+          return `<li>
+            <span class="cockpit-list-dot dot-task-overdue"></span>
+            <span class="cockpit-list-title">${esc(t.title || t.slug)}</span>
+            ${pr ? `<span class="cockpit-list-priority ${pr.cls}">${pr.label}</span>` : ''}
+            <span class="cockpit-list-meta">${esc(fmtDue(t.data && t.data.due))}</span>
+          </li>`;
+        }).join('')}</ul>`
+      : `<p class="cockpit-block-empty">没有活跃 task。</p>`;
+    const upcomingHtml = upcoming.length
+      ? `<ul class="cockpit-list">${upcoming.map((t) => {
+          return `<li>
+            <span class="cockpit-list-dot"></span>
+            <span class="cockpit-list-title">${esc(t.title || t.slug)}</span>
+            <span class="cockpit-list-meta">${esc(fmtDue(t.data && t.data.due))}</span>
+          </li>`;
+        }).join('')}</ul>`
+      : `<p class="cockpit-block-empty">未来 7 天没有到期的 task。</p>`;
+    return [
+      '<aside class="cockpit-rail">',
+        '<section class="cockpit-today-block block-active">',
+          '<header class="cockpit-block-header">',
+            '<span class="cockpit-block-icon">' + icon('bell', 14) + '</span>',
+            '<h2 class="cockpit-block-title">任务与提醒</h2>',
+            '<span class="cockpit-block-count">' + active.length + '</span>',
+          '</header>',
+          '<div class="cockpit-block-body">' + activeHtml + '</div>',
+        '</section>',
+        '<section class="cockpit-today-block block-upcoming">',
+          '<header class="cockpit-block-header">',
+            '<span class="cockpit-block-icon">' + icon('calendar', 14) + '</span>',
+            '<h2 class="cockpit-block-title">即将到来</h2>',
+            '<span class="cockpit-block-count">' + upcoming.length + '</span>',
+          '</header>',
+          '<div class="cockpit-block-body">' + upcomingHtml + '</div>',
+        '</section>',
+      '</aside>'
+    ].join('');
+  }
+
+    function renderTodayPanel() {
     const state = (window.__appState) || { entities: { person: [], task: [], project: [], link: [] } };
     const reflection = pickReflection(state);
     const wins = todayWins(state);
@@ -129,6 +229,8 @@
             '<p class="cockpit-today-sub">今日的 「想到 / 成就 / 关注」</p>',
           '</div>',
         '</header>',
+        '<div class="cockpit-today-wrap">',
+          '<div class="cockpit-today-main">',
         '<section class="cockpit-today-grid">',
           '<article class="cockpit-today-block block-reflection">',
             '<header class="cockpit-block-header">',
@@ -154,6 +256,9 @@
             '<div class="cockpit-block-body">' + focusHtml + '</div>',
           '</article>',
         '</section>',
+          '</div>',
+          renderRightRail(state),
+        '</div>',
       '</div>'
     ].join('');
   }
