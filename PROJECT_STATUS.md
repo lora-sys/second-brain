@@ -29,7 +29,8 @@ _Last updated: 2026-07-12 by @coordinator_
 | #v0.4.4.x+++++ | links_import / vault_list_by_type / VaultRepo refactor / Settings UI | Tauri | @coordinator | (follow-ups) | Backlog |
 | #v0.4.5 | Frontend rewire (config_get + vault_list_all → invoke) | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.6 | Tauri build pipeline + .deb + GitHub Actions | Tauri | @coordinator | merged | ✅ Done |
-| #v0.4.6.x | AppImage on Arch (linuxdeploy issue) | Tauri | @coordinator | (follow-up) | Backlog |
+| #v0.4.6 | app.js module split (bridge/state/icons/api) | Cockpit UI | @coordinator | merged | ✅ Done |
+| #v0.4.6.x | AppImage on Arch / further split / DOM building / virtualization | Tauri | @coordinator | (follow-up) | Backlog |
 | #v0.4.c3 | Cockpit today panel (感悟/成就/关注) | Cockpit UI | @coordinator | merged | ✅ Done |
 | #v0.4.c4 | Cockpit right rail (任务与提醒 + 即将到来) | Cockpit UI | @coordinator | merged | ✅ Done |
 | #v0.4.c5 | Cockpit bottom row (捕获/收藏/记忆回顾) | Cockpit UI | @coordinator | merged | ✅ Done |
