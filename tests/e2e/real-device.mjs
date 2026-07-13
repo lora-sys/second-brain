@@ -112,6 +112,41 @@ async (page) => {
   });
   await shot('docs/evidence/v0.4.7-real-device/screenshots/09-cockpit-resources.png');
 
+  // ---- 知识图谱 ----
+  await page.goto(BASE + '/?cockpit=1#/knowledge');
+  await page.waitForTimeout(1500);
+  await t('knowledge: page renders', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.cockpit-knowledge'));
+    if (!has) throw new Error('knowledge page did not render');
+  });
+  await t('knowledge: hero shows entity + connection counts', async () => {
+    const heroText = await page.evaluate(() => {
+      const hero = document.querySelector('.cockpit-knowledge-hero p');
+      return hero ? hero.textContent : '';
+    });
+    if (!heroText.includes('entities')) throw new Error('hero missing entities count: ' + heroText);
+    if (!heroText.includes('连接')) throw new Error('hero missing connection count: ' + heroText);
+  });
+  await t('knowledge: type distribution has 4 clusters', async () => {
+    const n = await page.evaluate(() => document.querySelectorAll('.cockpit-knowledge-cluster').length);
+    if (n !== 4) throw new Error('expected 4 clusters, got ' + n);
+  });
+  await t('knowledge: has at least one hub (with seed wikilinks)', async () => {
+    const n = await page.evaluate(() => document.querySelectorAll('.cockpit-knowledge-hub').length);
+    if (n === 0) throw new Error('no hubs');
+  });
+  await t('cockpit: 知识图谱 nav does NOT have soon badge', async () => {
+    const labels = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('.cockpit-nav-item')).map(el => ({
+        text: el.textContent.trim(),
+        soon: el.classList.contains('is-soon'),
+      }));
+    });
+    const kgEntry = labels.find(l => l.text.includes('知识图谱'));
+    if (!kgEntry) throw new Error('no 知识图谱 nav item');
+    if (kgEntry.soon) throw new Error('BUG: 知识图谱 still shows soon badge but renderKnowledge exists');
+  });
+
   // Bug-hunt: 回顾 sidebar must not show 'soon' badge.
   await page.goto(BASE + '/?cockpit=1');
   await page.waitForTimeout(1500);
