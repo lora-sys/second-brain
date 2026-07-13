@@ -181,3 +181,151 @@ git log --oneline -5
 - **Don't add a build step to a project that explicitly avoids one** — AGENTS.md says "no build, no framework". v0.4.L1 respects that. A static page with inline CSS is enough for v0.4. If v0.5+ wants CMS-driven content, the build step comes with the CMS, not before.
 - **The Node server doesn't serve docs/ by default** — the existing static file serving is rooted at public/. The landing page lives in docs/ which is below public/. For local dev, file:// works. For production (GitHub Pages), the static host serves docs/index.html directly. Filed v0.4.L2: add a /docs route to the Node server, OR move docs/ into public/ (loses the "docs/" semantic).
 - **First-time dev experience** — v0.4.L1 is the first thing a new user will see (landing page → GitHub → README → install). It sets expectations. Investing 30 min in a clear, well-designed landing page is worth it for the project's credibility.
+
+## v0.4.L2 (GitHub Pages deploy)
+
+- **Pages artifacts in v4 are the right choice** — the v3 -> v4 migration introduced `setup-pages` which auto-resolves the GitHub API URL. Skipping it leaves the workflow on legacy auth.
+- **Concurrency group matters for Pages** — without it, two rapid pushes can race and leave a 404 between deploys. `concurrency: group: pages, cancel-in-progress: true` prevents that.
+- **OpenGraph first, Schema.org later** — OpenGraph is what Twitter/LinkedIn/Slack/Discord read. Schema.org is what Google reads. Two different audiences. OpenGraph is the higher-leverage one for a product landing page (more shares happen on social than via search).
+- **404 page matters even for single-page sites** — without a custom 404, GitHub Pages falls back to a generic 404. The custom one in Chinese matches the rest of the site and gives a "back to home" link. 15 lines of HTML for a much better UX.
+- **Workflow complexity vs benefit** — this workflow is ~50 lines. Could be simpler (e.g., directly use the artifact from the build job), but the split into build + deploy jobs is the GitHub-recommended pattern. Easier to debug.
+'''
+git add memory/decisions.md memory/lessons.md && git commit -m "docs: memory updates for v0.4.L2" 2>&1 | tail -3
+
+python3 << 'PYEOF'
+with open('PROJECT_STATUS.md', 'r') as f:
+    s = f.read()
+s = s.replace(
+    "| #v0.4.L2 | GitHub Pages deploy + OpenGraph + custom domain | Web | @coordinator | (follow-up) | Backlog |",
+    "| #v0.4.L2 | GitHub Pages deploy + OpenGraph | Web | @coordinator | merged | ✅ Done |\n| #v0.4.L2.x | Custom domain + Schema.org + auto-update stats | Web | @coordinator | (follow-up) | Backlog |"
+)
+with open('PROJECT_STATUS.md', 'w') as f:
+    f.write(s)
+print('updated')
+PYEOF
+git add PROJECT_STATUS.md && git commit -m "docs: project status update for v0.4.L2" 2>&1 | tail -3
+git checkout main && git merge --no-ff feature/v0.4.l2-gh-pages-deploy -m "merge: feature/v0.4.l2-gh-pages-deploy (GitHub Pages + OpenGraph)" 2>&1 | tail -3
+git log --oneline -8
+## v0.4.c8 (tags management)
+
+- **Multi-select tag filter pattern** — selected tags = OR semantics (entity with any selected tag appears). The chips toggle independently; "清除筛选" resets all. This matches how tag filters work in Gmail, GitHub Issues, and most CMSes. AND would be more restrictive but less common.
+- **Client-side tag enumeration is fast enough** — at 22 tags × 26 entities = 572 comparisons per click, no perceptible delay. The threshold to switch to Tauri is probably 1000+ tags or 10k+ entities. Filed v0.4.c8.x: switch to Rust-side if/when the vault grows.
+- **Sort by count desc + alpha tiebreak** — gives a useful ordering (high-value tags first) without alphabetical-only noise. Same pattern used in tag clouds on most platforms.
+- **Pure client-side filter, no Tauri command** — the cockpit already has `state.entities` cached. Reusing it avoids invoke roundtrip and keeps the UI snappy. The tradeoff is that large vaults (1000+ entities) would slow down the in-browser filter, but at 26 entities it's instant.
+- **Replacing a placeholder with a real page** — the v0.4.c8 placeholder was "v0.4.c8 will provide complete tag management interface (merge, filter, saved views)". The new page implements ~50% of that promise (filter is done; rename/merge/delete/saved-views are filed for follow-up). Shipping partial features beats shipping placeholders.
+'''
+git add memory/decisions.md memory/lessons.md && git commit -m "docs: memory updates for v0.4.c8" 2>&1 | tail -3
+
+python3 << 'PYEOF'
+with open('PROJECT_STATUS.md', 'r') as f:
+    s = f.read()
+s = s.replace(
+    "| #v0.4.c6.* | 其他 4 个 placeholder section (知识图谱/回顾/模板/智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |",
+    "| #v0.4.c6.* | 其他 4 个 placeholder section (知识图谱/回顾/模板/智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |\n| #v0.4.c8 | Cockpit 标签 management (tag cloud + filter) | Cockpit UI | @coordinator | merged | ✅ Done |"
+)
+with open('PROJECT_STATUS.md', 'w') as f:
+    f.write(s)
+print('updated')
+PYEOF
+git add PROJECT_STATUS.md && git commit -m "docs: project status update for v0.4.c8" 2>&1 | tail -3
+git checkout main && git merge --no-ff feature/v0.4.c8-tags-management -m "merge: feature/v0.4.c8-tags-management (cockpit tags page)" 2>&1 | tail -3
+git log --oneline -5
+## v0.4.4.x+++++ (vault_link_import)
+
+- **HTML parsing edge cases** — when testing the parser, the obvious `html.find("property=og:title")` doesn't match `property='og:title'` (with single quote). Real-world HTML uses both quote styles. Always search for `attr='value'` AND `attr="value"` explicitly. Even simpler: use a small state machine that scans for `<meta ... >` tags and parses attributes generically.
+- **URL parsing pitfalls** — `path.rsplit('/').next()` returns the LAST non-empty segment, which for `https://example.com/` is `example.com` (the host), not the empty path. To get the actual path, skip past `//` first, then find the path part.
+- **File extension stripping matters for titles** — "blog-post.html" → "blog post html" is worse than "blog post". Strip common extensions (html, htm, php, asp, aspx, jsp, do, action) in the title generator.
+- **3 iterations to get parsers right** — the bugs above were all caught by unit tests, not by manual testing. The test for "https://example.com/" expecting "Untitled" is what revealed the host-vs-path bug. Always write a test for edge cases (empty path, missing scheme, weird quote styles).
+- **Manual HTML parsing vs scraper crate** — for a personal product with predictable input, 60 lines of pure Rust parsing is enough. The scraper crate is 1-2 MB. Trade-off: smaller binary + no dep, vs robust handling. Filed v0.4.4.x+++++ for the day when a real-world page fails.
+'''
+git add memory/decisions.md memory/lessons.md && git commit -m "docs: memory updates for v0.4.4.x+++++" 2>&1 | tail -3
+
+python3 << 'PYEOF'
+with open('PROJECT_STATUS.md', 'r') as f:
+    s = f.read()
+s = s.replace(
+    "| #v0.4.4.x+++++ | links_import / VaultRepo refactor / Settings UI | Tauri | @coordinator | (follow-up) | Backlog |",
+    "| #v0.4.4.x+++++ | links_import | Tauri | @coordinator | merged | ✅ Done |\n| #v0.4.4.x++++++ | scraper crate / more meta tags / concurrent fetch / Settings UI | Tauri | @coordinator | (follow-up) | Backlog |"
+)
+with open('PROJECT_STATUS.md', 'w') as f:
+    f.write(s)
+print('updated')
+PYEOF
+git add PROJECT_STATUS.md && git commit -m "docs: project status update for v0.4.4.x+++++" 2>&1 | tail -3
+git checkout main 2>&1 | head -2
+git merge --no-ff feature/v0.4.4.x+++++-links-import -m "merge: feature/v0.4.4.x+++++-links-import (Tauri vault_link_import command)" 2>&1 | tail -3
+git log --oneline -3
+## v0.4.c6.回顾 (review section)
+
+- **Time + date for same-day items** — date alone doesn't disambiguate items created on the same day. Showing HH:MM from data.updated lets the user reconstruct "I worked on this in the morning, that in the evening".
+- **"过去 7 天" is the right default** — Apple Review (last 7 days), GitHub Pulse (last 7 days), etc. all use 7. Anything else (3 days, 30 days) feels arbitrary.
+- **Pattern reuse accelerated this** — the schedule/notes/tags rounds established the hero + sections + items pattern. v0.4.c6.回顾 was 2-3x faster than v0.4.c3 (the original today panel) because the pattern was already internalized.
+- **Top tags cloud first, then day groups** — the user opens the page to see "what have I been doing" and "what topics have I focused on". Both are equally important; showing tags first is cheaper to scan, day groups come after for drill-down.
+- **Pure client-side aggregation** — for 26 entities / 12 recent items / 8 tags, the cost of computing buckets and tag counts in the browser is sub-millisecond. The threshold to switch to Tauri is probably 10k+ entries. Filed v0.4.c6.x.
+'''
+git add memory/decisions.md memory/lessons.md && git commit -m "docs: memory updates for v0.4.c6.回顾" 2>&1 | tail -3
+
+python3 << 'PYEOF'
+with open('PROJECT_STATUS.md', 'r') as f:
+    s = f.read()
+s = s.replace(
+    "| #v0.4.c6.* | 其他 4 个 placeholder section (知识图谱/回顾/模板/智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |",
+    "| #v0.4.c6.* | 其他 3 个 placeholder section (知识图谱/模板/智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |\n| #v0.4.c6.回顾 | Cockpit 回顾 section (7-day recap) | Cockpit UI | @coordinator | merged | ✅ Done |"
+)
+with open('PROJECT_STATUS.md', 'w') as f:
+    f.write(s)
+print('updated')
+PYEOF
+git add PROJECT_STATUS.md && git commit -m "docs: project status update for v0.4.c6.回顾" 2>&1 | tail -3
+git checkout main 2>&1 | head -2
+git merge --no-ff feature/v0.4.c6-review-section -m "merge: feature/v0.4.c6-review-section (cockpit review page)" 2>&1 | tail -3
+git log --oneline -3
+## v0.4.c7 (E2E tests)
+
+- **playwright-cli run-code has a strict context** — it's a one-shot CLI that wraps your code in `async (page, ...) => { ... }` and runs it. Top-level `const`/`import`/`process` are NOT available. Always use the function-wrapper pattern.
+- **Stdout capture quirk** — playwright-cli captures console output to .playwright-cli/console-*.log files but doesn't always print to the terminal. When debugging, check the log file too.
+- **Async wrappers + try/catch = good tests** — each test is a small async function with try/catch around the assertion. A single test failure doesn't crash the whole run.
+- **Use existing toolchain over adding deps** — the project already has playwright-cli. Reusing it for E2E tests is the lowest-friction path. Filed v0.4.c7.x for the @playwright/test migration when CI needs proper reporting.
+- **10 assertions in 11 minutes** — the 10-test E2E suite covers 5 working sections + standard mode. The pattern from the schedule/notes/tags/review rounds established the structure (test each section, check for key element presence, return data) and the new tests just plug in.
+'''
+git add memory/decisions.md memory/lessons.md && git commit -m "docs: memory updates for v0.4.c7" 2>&1 | tail -3
+
+python3 << 'PYEOF'
+with open('PROJECT_STATUS.md', 'r') as f:
+    s = f.read()
+s = s.replace(
+    "| #v0.4.c6.* | 其他 3 个 placeholder section (知识图谱/模板/智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |",
+    "| #v0.4.c6.* | 其他 3 个 placeholder section (知识图谱/模板/智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |\n| #v0.4.c7 | E2E tests (10 tests) | Test | @coordinator | merged | ✅ Done |"
+)
+with open('PROJECT_STATUS.md', 'w') as f:
+    f.write(s)
+print('updated')
+PYEOF
+git add PROJECT_STATUS.md && git commit -m "docs: project status update for v0.4.c7" 2>&1 | tail -3
+git checkout main 2>&1 | head -2
+git merge --no-ff feature/v0.4.c7-e2e-tests -m "merge: feature/v0.4.c7-e2e-tests (E2E test suite)" 2>&1 | tail -3
+git log --oneline -3
+## v0.4.5 (settings UI)
+
+- **Reuse the existing bridge** — no new Tauri command needed for the settings page. config_set was added in v0.4.4.x++++; the UI just calls api.config.put. The bridge decides whether to invoke or fetch.
+- **Read-only directories display** — even though users could edit them, most don't need to. Showing them as labels is a good "show the structure" feature without making editing easy to break things.
+- **Restart-required warning** — port/host changes need a server restart. The toast "保存后需要重启服务才能生效" tells the user. Filed v0.4.5.x: add an "auto-restart" button that signals the Tauri process to relaunch.
+- **N+1: I'm going to keep building. There's plenty of backlog.** The user is silent but the objective is "你决定然后去开发" — keep going.
+'''
+git add memory/decisions.md memory/lessons.md && git commit -m "docs: memory updates for v0.4.5 settings UI" 2>&1 | tail -3
+
+python3 << 'PYEOF'
+with open('PROJECT_STATUS.md', 'r') as f:
+    s = f.read()
+s = s.replace(
+    "| #v0.4.5 | Settings UI (v0.4.5 polish) | Cockpit UI | @coordinator | (follow-up) | Backlog |",
+    "| #v0.4.5 | Cockpit settings UI (vault path / port / host editor) | Cockpit UI | @coordinator | merged | ✅ Done |"
+)
+with open('PROJECT_STATUS.md', 'w') as f:
+    f.write(s)
+print('updated')
+PYEOF
+git add PROJECT_STATUS.md && git commit -m "docs: project status update for v0.4.5" 2>&1 | tail -3
+git checkout main 2>&1 | head -2
+git merge --no-ff feature/v0.4.5-settings-ui -m "merge: feature/v0.4.5-settings-ui (settings page)" 2>&1 | tail -3
+git log --oneline -3

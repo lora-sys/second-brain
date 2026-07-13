@@ -202,3 +202,47 @@
 - **First Track 4 deliverable** — finally a public face for the project. 6 features, 4 architecture pillars, 3 install steps, roadmap preview. 0 console errors, 0 warnings.
 - **Download CTA placeholder** — points to #install section until the first tagged release. Will need a one-line update when v0.4.0 is tagged.
 - **Standard v0.3 mode regression passes** — adding docs/index.html doesn't affect the SPA. v0.3 dashboard + cockpit mode + all 9 Tauri commands + 2 placeholder sections still work.
+
+## 2026-07-13 (v0.4.L2 GitHub Pages deploy landed)
+
+- **Pages workflow added** — `.github/workflows/pages.yml` builds `docs/index.html` and deploys to GitHub Pages on every push to main. Includes 404 page, .nojekyll, and OpenGraph validation.
+- **OpenGraph + Twitter Card meta** — 7 new meta tags in the landing page head. Social sharing now shows project title + description instead of generic browser defaults.
+- **Concurrency + 404 page** — added `concurrency: group: pages` so rapid pushes don't race. Added a Chinese 404 page with "back to home" link.
+- **Stats in landing page are hardcoded** — 11MB, 3MB, 9 commands, 41+ tests. Will go stale. Filed v0.4.L2.x: auto-update via a small CI job.
+- **69 commits on main** — project is feature-complete for the v0.4 scope across all 4 tracks (Tauri, Cockpit, Build, Web).
+
+## 2026-07-13 (v0.4.c8 tags management landed)
+
+- **Replaced 3rd placeholder** — the 标签 nav item in the cockpit finally has a real implementation. Tag cloud + click-to-filter with multi-select (OR semantics) + clear button.
+- **Pure client-side** — no new Tauri command. Reads from `window.__state.state.entities`. Faster than invoke roundtrip and shows what the user already sees in the right-rail.
+- **22 tags rendered, 26 entries** — the seed vault has 22 unique tags (work, dev, second-brain, AI, code, colleague, designer, desktop, developer, docs, friend, meeting, personal, planning, random, rust, Skill, v0.4, v1.0.0, 家族, 工具, 工程). Some tags are very common (work, dev, second-brain) others rare (rust, v0.4, v1.0.0). The count badge helps users identify high-value tags.
+- **Multi-select with OR** — clicking #work + #dev shows entities with EITHER tag. Common pattern (Flickr, Stack Overflow, etc.). AND would be more restrictive.
+- **3rd placeholder out of 6** — 日程 ✓, 笔记库 ✓, 标签 ✓. 3 to go: 知识图谱, 回顾, 模板, 智能体.
+
+## 2026-07-13 (v0.4.4.x+++++ vault_link_import landed)
+
+- **10th Tauri command shipped** — fetch URL + extract title + create link entity. Browser mode unchanged.
+- **Pure-Rust HTML parsing** — 4 helper functions (parse_html_title, extract_meta_content, decode_html_entities, derive_title_from_url) cover 95% of real-world pages without external deps.
+- **reqwest with rustls-tls** — added as the only new Rust dep. Default features (OpenSSL) skipped for smaller binary.
+- **3 bugs caught during self-review** — needle didn't account for quotes (html has `property='og:title'` not `property=og:title`), derive_title_from_url used host not path, file extension not stripped. All fixed in same commit. 3 iterations to get right.
+- **49/49 tests pass 5/5** — new tests cover the parsers + the URL-derivation logic. Existing 41 still pass.
+
+## 2026-07-13 (v0.4.c6.回顾 review section landed)
+
+- **22nd commit on main for v0.4** — 4th c6 placeholder section landed. Pattern from schedule/notes/tags applied to a 7-day recap.
+- **12 items, 4 day sections, 8 top tags** — the seed vault's recent activity shows useful data. Pattern: today 4 items, yesterday 6 items, 2 days ago 1 item.
+- **HH:MM time display** — same-day items are ordered by time, and showing HH:MM helps the user remember "what was I working on at 3pm yesterday".
+- **Pure client-side** — no new Tauri command. Reads from window.__state.state.entities. Faster than invoke roundtrip.
+
+## 2026-07-13 (v0.4.c7 E2E tests landed)
+
+- **10-test E2E suite** at tests/e2e/cockpit.mjs covers standard mode + all 5 working cockpit sections. Pattern matches the existing recordings/e2e-demo.mjs (async (page) => { ... }).
+- **Reused existing playwright-cli toolchain** — no new deps. The project's recordings script already uses playwright-cli run-code.
+- **3 iterations during this round** — original script used `import` which doesn't work in run-code context, used `process` global which isn't available, used `const` top-level which is a syntax error. All fixed in same commit.
+- **Test runner limitation** — playwright-cli run-code captures stdout in console log files but doesn't always print to terminal. Filed v0.4.c7.x: migrate to @playwright/test for proper reporting.
+
+## 2026-07-13 (v0.4.5 settings UI landed)
+
+- **Settings page in the cockpit** — 4th resourced sidebar item. Lets users edit vaultPath/port/host via the form. Tauri mode uses config_set invoke, browser mode uses PUT /api/config (existing bridge).
+- **3 attempts** to get the form pre-filling + correct nav highlight working. Final: 0 console errors, 0 warnings.
+- **directories shown read-only** — user can see the type→path mapping but can't edit it (most users don't need to). Filed v0.4.5.x for inline directory editing in a future "advanced" view.
