@@ -108,3 +108,13 @@
 - **Pre-existing parallel-test race fixed** — old chdir-based tests failed intermittently under parallel `cargo test`. Converted to SECOND_BRAIN_CONFIG env var pattern.
 - **parse_id first attempt was wrong** — hard-coded type check against person/task/project/link, but id is `{dir}/{slug}` not `{type}/{slug}`. Fixed by removing the check from parse_id and doing it via cfg inversion in vault_read.
 - **14/14 tests pass** (5 new for vault_read and parse_id, 9 pre-existing still passing).
+
+## 2026-07-13 (v0.4.4.x+ vault_create landed)
+
+- **vault_create Rust command shipped** — 4th Tauri command. With config_get + vault_list_all + vault_read + vault_create, the desktop app has a real read-write loop for the "new entity" path.
+- **Self-rolled date math instead of pulling chrono** — added ~60 lines of proleptic Gregorian conversion to avoid a new dep. Filed as polish to swap in chrono when convenient.
+- **Portable file lock via `.sb-lock` marker file** — busy-wait + drop on release. OS-level flock has inconsistent semantics across Linux/Windows/BSD. Marker file is universal.
+- **Atomic write via `.tmp-{pid}-{slug}` then rename** — standard POSIX-safe pattern. On crash mid-write, the directory has at most a `.tmp-*` file (cleaned by next successful write) and the real file is either old or new, never half-written.
+- **Slug collision handling** — append `-2`, `-3`, etc. up to 100 retries. Real-world users hit this when they create multiple "Buy milk" tasks.
+- **EnvGuard RAII pattern for env-var tests** — Drop restores the env var even if the test panics. Replaces the panic-prone `let prev = ...; set_var; ...; match prev { restore }` pattern. Also makes the lock acquisition obvious (just `let _lock = ENV_LOCK.lock()...` at the top).
+- **Parallel test race on `std::env::set_var` in Rust 1.97** — `set_var` is now `unsafe` because the stdlib doesn't synchronize. A mutex around the test is required; my first attempt had only my new tests using the mutex, and the old `set_var` calls in pre-existing tests were racing with my new tests' env reads. Fixed by adding the mutex to ALL env-var tests.
