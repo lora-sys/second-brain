@@ -1,0 +1,79 @@
+name: Deploy Landing Page
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Validate landing page HTML
+        run: |
+          set -e
+          # Sanity checks on the landing page.
+          test -f docs/index.html
+          grep -q '<title>第二大脑' docs/index.html
+          grep -q 'class="hero"' docs/index.html
+          grep -q 'id="features"' docs/index.html
+          grep -q 'id="architecture"' docs/index.html
+          grep -q 'id="install"' docs/index.html
+          echo "landing page OK"
+
+      - name: Setup Pages artifact
+        run: |
+          mkdir -p _site
+          cp docs/index.html _site/index.html
+          # Add a .nojekyll file so GitHub Pages serves the page as-is
+          # (otherwise files starting with _ are ignored).
+          touch _site/.nojekyll
+          # Optional: add a simple 404 page.
+          cat > _site/404.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="zh-CN"><head><meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>404 · 第二大脑</title>
+          <style>
+            body { font-family: -apple-system, system-ui, sans-serif; background: #fbf9f4; color: #1c1b18; margin: 0; }
+            .wrap { max-width: 480px; margin: 80px auto; padding: 0 24px; text-align: center; }
+            h1 { font-size: 96px; margin: 0 0 16px; opacity: 0.3; }
+            p { color: #5a574d; line-height: 1.6; }
+            a { color: #5b21b6; text-decoration: none; border-bottom: 1px solid currentColor; }
+          </style></head>
+          <body><div class="wrap">
+            <h1>404</h1>
+            <p>这页不存在。<a href="/">回首页 →</a></p>
+          </div></body></html>
+          EOF
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
