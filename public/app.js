@@ -148,7 +148,7 @@
       }
       return api.del(`/api/entities/${encodeURIComponent(id)}`);
     },
-    search: (q) => api.get(`/api/search?q=${encodeURIComponent(q)}`),
+    search: (q) => invokeOrFetch('vault_search', { query: q, type_filter: null }, `/api/search?q=${encodeURIComponent(q)}`),
     dashboard: () => api.get('/api/dashboard'),
     importLink: (body) => api.post('/api/links/import', body),
   };

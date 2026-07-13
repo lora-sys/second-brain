@@ -104,3 +104,10 @@
 - **Tauri 2.0 release builds use webkit2gtk-4.1 by default** — the apt package on ubuntu-22.04 is `libwebkit2gtk-4.1-dev`. Older guides reference 4.0 which is wrong for Tauri 2.
 - **Draft release > auto-publish** — for a project that cares about Evidence and quality, the manual review of a draft release is the right gate. Auto-publish is fine for stable, frequent-release projects; we ship maybe 1-2 times per quarter, so the review is cheap.
 - **Build pipeline lives in `.github/workflows/release.yml`** — the workflow file is the contract. Anyone can read it to understand "what does shipping look like". The tag-v* + draft-release pattern is the most common shape for small Rust projects.
+
+## v0.4.4.x+++ (vault_search)
+
+- **Relevance scoring is a UX decision disguised as math** — the score formula reflects "what should float to the top". For a personal vault, "exact title match" matters most, then "title substring", then "body match". Getting this wrong (e.g., body matches outranking partial titles) is the difference between "useful search" and "noise". Tune for the user, not for the math.
+- **Empty query vs no results are different semantically** — empty query is a programmer error (or UI bug), no results is a normal outcome. Returning an error for one and an empty Vec for the other lets the UI show different messages ("type something" vs "no matches") without string-matching error messages.
+- **Reuse `vault_list_all` for search** — even though it's O(N), the same walk already produces the data. Adding a separate walk for search would be a maintenance burden. The optimization (indexed search) is a v0.4.4.x++++ polish.
+- **Frontmatter data fields are not searched by default** — that's the right call for v0.4.4.x+++. Users searching for "urgent" expect to find tasks they titled "Urgent task", not tasks tagged urgent. Data fields are structured (status:done, priority:high) and would need a different query syntax (`status:done`) to search semantically. Filed for v0.4.4.x++++.

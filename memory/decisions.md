@@ -136,3 +136,13 @@
 - **Identifier fix** — `com.secondbrain.app` → `com.secondbrain.desktop`. The `.app` suffix conflicts with the macOS app bundle extension; `.desktop` is the Linux convention.
 - **Build is 2-3 min cold, ~30s warm** — mostly webkit2gtk + GTK. The optimization gap (207MB debug → 11MB release) is the usual Rust codegen + strip-debug-info story.
 - **Draft releases, not auto-publish** — matches the project's "every change has Evidence" philosophy. Maintainer reviews the draft before going public.
+
+## 2026-07-13 (v0.4.4.x+++ vault_search landed)
+
+- **vault_search Rust command shipped** — 7th Tauri command. Full-text search across all entities with relevance scoring (exact title > title match > body match).
+- **Scoring formula tuned** — title match worth 100, body match worth 10, exact title match worth 500 (big jump to catch "show me X specifically" queries). Position-based bonus within a field (earlier = higher) breaks ties.
+- **O(N) walk, no index** — for personal vaults (hundreds of entities) this is fine. Inverted index is filed as polish for 10k+ entity scale.
+- **Empty query errors, not empty Vec** — distinguishes "user typed nothing" (error) from "nothing matched" (empty Vec). Better UX for the search bar.
+- **No data-field search** — doesn't match against tags, status, priority, due. Filed as polish with field-prefix syntax (`tags:urgent`).
+- **No pagination** — returns all matches, lets UI paginate. Filed as polish with top-N + total count.
+- **Tauri desktop app is now feature-complete for v0.4 CRUD+search scope** — 7 commands: config_get, vault_list_all, vault_read, vault_create, vault_update, vault_delete, vault_search. Every entity operation available in browser is also available in Tauri mode.

@@ -24,7 +24,8 @@ _Last updated: 2026-07-12 by @coordinator_
 | #v0.4.4.x | vault_read + frontend rewire | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.4.x+ | vault_create | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.4.x++ | vault_update + vault_delete | Tauri | @coordinator | merged | ✅ Done |
-| #v0.4.4.x+++ | config_set / vault_search / links_import / vault_list_by_type | Tauri | @coordinator | (follow-ups) | Backlog |
+| #v0.4.4.x+++ | vault_search | Tauri | @coordinator | merged | ✅ Done |
+| #v0.4.4.x++++ | config_set / links_import / vault_list_by_type / search polish | Tauri | @coordinator | (follow-ups) | Backlog |
 | #v0.4.5 | Frontend rewire (config_get + vault_list_all → invoke) | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.6 | Tauri build pipeline + .deb + GitHub Actions | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.6.x | AppImage on Arch (linuxdeploy issue) | Tauri | @coordinator | (follow-up) | Backlog |
