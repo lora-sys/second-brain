@@ -154,3 +154,11 @@
 - **Captures: forward-compatible empty state** — the panel layout + data hook (`data.captured === true`) is in v0.4.c5. The actual capture flow (⌘N keyboard, mobile share, etc.) lands in v0.5. The empty state tells the user to expect it.
 - **Memory recall = 6 most recently updated entities across all types** — type-agnostic, fits in one panel, sorts by `data.updated` desc. Filed polish: real "memory recall" would consider capture-order + read-frequency, not just recency.
 - **Cockpit is becoming a "daily use" surface, not a placeholder** — 8 panels is a lot. v0.4.6 should split cockpit.js into modules before it grows further.
+
+## 2026-07-13 (v0.4.4.x++++ config_set landed)
+
+- **config_set Rust command shipped** — 8th Tauri command. Patch-semantics update (Option fields) lets callers change just the fields they want. Per-file lock (separate from per-directory lock for vault ops) prevents racing config writes.
+- **Tauri app is now self-sufficient for setup + CRUD + search** — 8 commands. config_set closes the last gap: the user no longer needs to hand-edit config.json.
+- **Per-file vs per-directory lock** — config.json gets its own `.json.lock` (not `.sb-lock` which is for vault directories). Two lock namespaces prevents accidental cross-contamination and lets config updates happen while a vault read is in flight.
+- **Option<T> for patch semantics** — Rust idiom. Each field's `None` means "don't change", `Some(value)` means "set to this". Avoids accidental clobbering. The web SPA's PUT body already uses partial-update semantics; this matches.
+- **38/38 tests pass in parallel** — the pattern (ENV_LOCK + EnvGuard + atomic writes) continues to keep test stability.
