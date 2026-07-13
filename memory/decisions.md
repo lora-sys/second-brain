@@ -178,3 +178,18 @@
 - **Exposed window.__appRouteImpl** — when refactoring broke the implicit coupling, needed to expose the function. Filed v0.4.6.x: move routeImplFor to its own module (router.js) so it's defined once.
 - **Done-status tasks show in 已逾期** — known limitation. Filed v0.4.c6.x polish: filter out status:done from overdue bucket.
 - **Schedule page is the first of 6 placeholder sections** — 笔记库/知识图谱/回顾/模板/智能体 are all still 'soon'. The schedule section sets the pattern: helper functions, render function, CSS, route wiring.
+
+## 2026-07-13 (v0.4.c6.notes landed)
+
+- **2nd placeholder section shipped** — 笔记库 (Notes) reuses the schedule pattern (hero + grouped sections with type-colored borders). 12 items in 4 groups render with tags + updated date.
+- **Pattern is now established** — schedule and notes both follow: hero → sections by group → empty state. Future sections (知识图谱, 回顾, 模板, 智能体) can reuse this template with minor changes.
+- **Route duplication reminder** — both `routeImplFor` (IIFE-internal) and `window.__appRouteImpl` (exposed) need updating. Filed v0.4.6.x: extract to router.js.
+- **Nav "SOON" badge cleanup** — first patch missed the nav entry; sed caught it. Filed: when updating the same field in two places (nav impl + routeImplFor), use sed with explicit pattern to avoid Python byte mismatches.
+
+## 2026-07-13 (v0.4.4.x++++ VaultRepo + vault_list_by_type landed)
+
+- **VaultRepo struct extracted** — config + root + walk/walk_type methods. vault_list_all shrunk from 60 to 8 lines. Pattern is now reusable for new commands.
+- **vault_list_by_type added** — 9th Tauri command. api.list(type) now uses it in Tauri mode (was always going through vault_list_all + client-side filter). Faster, cleaner.
+- **Read-only VaultRepo scope** — write commands (create/update/delete) still have their own file-lock + walk code. They use per-directory locks that are orthogonal to "read what's in the vault". Filed v0.4.4.x+++++ for full unification via a trait.
+- **41/41 tests pass in parallel** — 38 pre-existing tests still pass after the refactor (proves the behavior is preserved). 3 new tests for vault_list_by_type.
+- **Two iterations during this round** — orphaned `,` after a marker match (didn't see the line continuation) + an unused import (compiler warning). Both fixed in the same commit.
