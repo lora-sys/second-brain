@@ -28,6 +28,7 @@
     { hash: '#/templates', label: '模板', icon: 'copy', impl: 'soon' },
     { hash: '#/tags', label: '标签', icon: 'tag', impl: 'tags' },
     { hash: '#/agent', label: '智能体', icon: 'sparkle', impl: 'soon' },
+    { hash: '#/settings', label: '设置', icon: 'settings', impl: 'settings' },
   ];
 
   const ICONS = {
@@ -704,6 +705,95 @@
     ].join('');
   }
 
+    // -------------------- Settings (v0.4.5) --------------------
+  function renderSettings(state) {
+    const cfg = state.config || (window.__state && window.__state.state && window.__state.state.config) || {};
+    return [
+      '<div class="cockpit-settings">',
+        '<header class="cockpit-settings-hero">',
+          icon('settings', 24),
+          '<div>',
+            '<h1>设置</h1>',
+            '<p>修改 Vault 路径、监听端口和地址。保存后需要重启服务才能生效。</p>',
+          '</div>',
+        '</header>',
+        '<form class="cockpit-settings-form" id="cockpit-settings-form">',
+          '<div class="cockpit-settings-row">',
+            '<label>Vault 路径</label>',
+            '<input type="text" id="cfg-vaultPath" value="' + esc(cfg.vaultPath || '') + '" placeholder="/path/to/Obsidian Vault" />',
+          '</div>',
+          '<div class="cockpit-settings-row">',
+            '<label>监听端口</label>',
+            '<input type="number" id="cfg-port" value="' + (cfg.port || 3939) + '" />',
+          '</div>',
+          '<div class="cockpit-settings-row">',
+            '<label>监听地址</label>',
+            '<input type="text" id="cfg-host" value="' + esc(cfg.host || '127.0.0.1') + '" />',
+          '</div>',
+          '<div class="cockpit-settings-row">',
+            '<label>directories</label>',
+            '<div class="cockpit-settings-dirs" id="cfg-directories-display">',
+              renderDirsDisplay(cfg.directories || {}),
+            '</div>',
+          '</div>',
+          '<div class="cockpit-settings-actions">',
+            '<button type="submit" class="btn btn-primary" id="cfg-save">保存</button>',
+            '<button type="button" class="btn" id="cfg-reload">重载</button>',
+          '</div>',
+        '</form>',
+      '</div>'
+    ].join('');
+  }
+  function renderDirsDisplay(dirs) {
+    return Object.entries(dirs).map(([type, dir]) => {
+      return '<div class="cockpit-settings-dir-row">' +
+        '<span class="cockpit-settings-dir-type">' + esc(type) + '</span>' +
+        '<span class="cockpit-settings-dir-arrow">→</span>' +
+        '<code class="cockpit-settings-dir-path">' + esc(dir) + '</code>' +
+      '</div>';
+    }).join('');
+  }
+  // Wire form submission after the form is in the DOM.
+  function bindSettingsForm(content) {
+    const form = content.querySelector('#cockpit-settings-form');
+    if (!form) return;
+    const submit = (ev) => {
+      ev.preventDefault();
+      const vaultPath = content.querySelector('#cfg-vaultPath').value.trim();
+      const port = parseInt(content.querySelector('#cfg-port').value, 10) || null;
+      const host = content.querySelector('#cfg-host').value.trim();
+      if (!vaultPath) {
+        if (window.__appToast) window.__appToast('Vault 路径不能为空', 'error');
+        return;
+      }
+      // Build body matching what api.config.put expects.
+      const body = { vaultPath };
+      if (!isNaN(port) && port) body.port = port;
+      if (host) body.host = host;
+      if (window.__appApi && window.__appApi.api && window.__appApi.api.config) {
+        window.__appApi.api.config.put(body).then((next) => {
+          if (next) {
+            if (window.__state) window.__state.state.config = next;
+            if (window.__appToast) window.__appToast('已保存。重启服务后端口/地址生效。', 'success');
+            if (window.__cockpit && window.__cockpit.refreshVaultName) {
+              window.__cockpit.refreshVaultName();
+            }
+          }
+        }).catch((err) => {
+          if (window.__appToast) window.__appToast(err.message || String(err), 'error');
+        });
+      }
+    };
+    const reload = () => {
+      // Re-render by re-routing to /settings.
+      location.hash = '#/dashboard';
+      setTimeout(() => { location.hash = '#/settings'; }, 50);
+    };
+    form.addEventListener('submit', submit);
+    const reloadBtn = content.querySelector('#cfg-reload');
+    if (reloadBtn) reloadBtn.addEventListener('click', reload);
+  }
+
     function renderTodayPanel() {
     const state = (window.__appState) || { entities: { person: [], task: [], project: [], link: [] } };
     const reflection = pickReflection(state);
@@ -926,6 +1016,11 @@
       if (route === 'tags') {
         content.innerHTML = renderTags(state);
         bindTagClicks(content);
+        return;
+      }
+      if (route === 'settings') {
+        content.innerHTML = renderSettings(state);
+        bindSettingsForm(content);
         return;
       }
       if (route === 'review') {
