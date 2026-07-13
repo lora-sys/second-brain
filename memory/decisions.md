@@ -127,3 +127,12 @@
 - **27/27 tests pass in parallel** — added 6 tests for the new commands. ENV_LOCK mutex + EnvGuard RAII pattern continues to keep env-var tests stable.
 - **Frontend bridge extended** — api.update and api.delete now invoke-first with fetch fallback. Same pattern as vault_create.
 - **Test reliability proven** — 5 consecutive parallel `cargo test` runs all 27/27 pass, zero flakes. The ENV_LOCK mutex + EnvGuard + env-var-aware helpers finally nailed the parallel-test race.
+
+## 2026-07-13 (v0.4.6 Tauri build pipeline landed)
+
+- **Local build works end-to-end** — `cargo tauri build --bundles deb` produces an 11MB release binary and a 3MB .deb package. The Tauri app can now be distributed to Linux users.
+- **AppImage blocked on Arch** — `linuxdeploy` upstream has a bug with empty path argument that fails on this sandbox. The .deb path (native `cargo-deb`) works. CI on ubuntu-22.04 should produce AppImage.
+- **GitHub Actions workflow added** — `.github/workflows/release.yml` triggers on tag push or manual dispatch. Builds on ubuntu-22.04, uploads artifacts, creates draft release with auto-generated notes. Manual publish step keeps release quality controlled.
+- **Identifier fix** — `com.secondbrain.app` → `com.secondbrain.desktop`. The `.app` suffix conflicts with the macOS app bundle extension; `.desktop` is the Linux convention.
+- **Build is 2-3 min cold, ~30s warm** — mostly webkit2gtk + GTK. The optimization gap (207MB debug → 11MB release) is the usual Rust codegen + strip-debug-info story.
+- **Draft releases, not auto-publish** — matches the project's "every change has Evidence" philosophy. Maintainer reviews the draft before going public.
