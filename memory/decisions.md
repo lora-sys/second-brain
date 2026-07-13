@@ -193,3 +193,12 @@
 - **Read-only VaultRepo scope** — write commands (create/update/delete) still have their own file-lock + walk code. They use per-directory locks that are orthogonal to "read what's in the vault". Filed v0.4.4.x+++++ for full unification via a trait.
 - **41/41 tests pass in parallel** — 38 pre-existing tests still pass after the refactor (proves the behavior is preserved). 3 new tests for vault_list_by_type.
 - **Two iterations during this round** — orphaned `,` after a marker match (didn't see the line continuation) + an unused import (compiler warning). Both fixed in the same commit.
+
+## 2026-07-13 (v0.4.L1 landing page landed)
+
+- **Track 4 first landing page** — docs/index.html, single file, no JS, no build step. 18.6 KB. Reuses the SPA's design tokens.
+- **"One file, no framework" matches project philosophy** — AGENTS.md says "no build, no framework". The landing page is consistent: inline CSS, no JS, just HTML+CSS that can be served by any static host (including file://).
+- **Same design tokens as the SPA** — Fraunces, Inter, JetBrains Mono, type colors (orange/sky/violet/emerald), brand mark. A user who has used the app recognizes the visual language. Future polish: extract shared tokens to a single CSS file imported by both.
+- **First Track 4 deliverable** — finally a public face for the project. 6 features, 4 architecture pillars, 3 install steps, roadmap preview. 0 console errors, 0 warnings.
+- **Download CTA placeholder** — points to #install section until the first tagged release. Will need a one-line update when v0.4.0 is tagged.
+- **Standard v0.3 mode regression passes** — adding docs/index.html doesn't affect the SPA. v0.3 dashboard + cockpit mode + all 9 Tauri commands + 2 placeholder sections still work.
