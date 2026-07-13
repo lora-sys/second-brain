@@ -2696,3 +2696,113 @@ body.cockpit-mode .app { display: none !important; }
   color: var(--text-soft);
 }
 .cockpit-review-empty p { margin: 0; font-size: 13px; }
+
+/* ============================================================================
+ * v0.4.5 — Cockpit Settings Page
+ * Form for vault path / port / host. Tauri mode: invoke config_set.
+ * Browser mode: PUT /api/config.
+ * ========================================================================== */
+
+.cockpit-settings {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.cockpit-settings-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.cockpit-settings-hero svg { color: var(--text-soft); flex-shrink: 0; }
+.cockpit-settings-hero h1 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+.cockpit-settings-hero p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.cockpit-settings-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cockpit-settings-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.cockpit-settings-row label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-align: right;
+}
+.cockpit-settings-row input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: 13.5px;
+  font-family: var(--font-mono);
+  background: var(--bg);
+  color: var(--text);
+}
+.cockpit-settings-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+}
+.cockpit-settings-dirs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+.cockpit-settings-dir-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cockpit-settings-dir-type {
+  display: inline-block;
+  min-width: 60px;
+  padding: 2px 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+  color: var(--text-soft);
+}
+.cockpit-settings-dir-arrow {
+  color: var(--text-faint);
+}
+.cockpit-settings-dir-path {
+  color: var(--text);
+  background: transparent;
+  padding: 0;
+  border: none;
+}
+.cockpit-settings-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+}
