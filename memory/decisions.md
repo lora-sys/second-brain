@@ -170,3 +170,11 @@
 - **`window.__*` pattern over ES modules** — ES modules would require `<script type="module">` and a build step. The `window.__*` pattern is the lowest-friction for a no-build SPA.
 - **Two iterations to fix tauri/api not defined** — first commit had bare `tauri` and `api` references after the split; second pass added the destructuring from `window.__bridge` / `window.__api`. Both modes (standard + cockpit) now render with 0 console errors.
 - **Total LOC unchanged** — extracted modules are IIFEs that attach globals, so the line count is roughly the same. The win is in navigability and responsibility separation.
+
+## 2026-07-13 (v0.4.c6-schedule landed)
+
+- **First cockpit placeholder section shipped** — 日程 (Schedule) is no longer "soon". Renders a timeline with 5 buckets (已逾期/今天/明天/本周内/之后) sourced from tasks (data.due) + projects (data.deadline/data.due).
+- **Three iterations to fix bugs in same commit** — (1) r#type → type (Rust raw syntax in JS), (2) routeImplFor needed in app.js, (3) entity pre-load was hardcoding 'dashboard' route and silently flipping schedule → dashboard. All caught during self-review, all fixed in the same commit (the third one was a real UX bug — navigating to schedule and being silently kicked back to dashboard).
+- **Exposed window.__appRouteImpl** — when refactoring broke the implicit coupling, needed to expose the function. Filed v0.4.6.x: move routeImplFor to its own module (router.js) so it's defined once.
+- **Done-status tasks show in 已逾期** — known limitation. Filed v0.4.c6.x polish: filter out status:done from overdue bucket.
+- **Schedule page is the first of 6 placeholder sections** — 笔记库/知识图谱/回顾/模板/智能体 are all still 'soon'. The schedule section sets the pattern: helper functions, render function, CSS, route wiring.
