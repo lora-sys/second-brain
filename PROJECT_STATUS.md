@@ -26,7 +26,8 @@ _Last updated: 2026-07-12 by @coordinator_
 | #v0.4.4.x++ | vault_update + vault_delete | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.4.x+++ | vault_search | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.4.x++++ | config_set | Tauri | @coordinator | merged | ✅ Done |
-| #v0.4.4.x+++++ | links_import / vault_list_by_type / VaultRepo refactor / Settings UI | Tauri | @coordinator | (follow-ups) | Backlog |
+| #v0.4.4.x+++++ | VaultRepo refactor + vault_list_by_type | Tauri | @coordinator | merged | ✅ Done |
+| #v0.4.4.x++++++ | links_import / VaultOps trait / Settings UI | Tauri | @coordinator | (follow-up) | Backlog |
 | #v0.4.5 | Frontend rewire (config_get + vault_list_all → invoke) | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.6 | Tauri build pipeline + .deb + GitHub Actions | Tauri | @coordinator | merged | ✅ Done |
 | #v0.4.6 | app.js module split (bridge/state/icons/api) | Cockpit UI | @coordinator | merged | ✅ Done |
