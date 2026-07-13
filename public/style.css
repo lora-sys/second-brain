@@ -2158,3 +2158,149 @@ body.cockpit-mode .app { display: none !important; }
 @media (max-width: 1100px) {
   .cockpit-bottom-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================================
+ * v0.4.c6 — Cockpit Schedule Section
+ * Timeline grouped by: 已逾期 / 今天 / 明天 / 本周内 / 之后.
+ * Data from tasks (data.due) + projects (data.deadline/data.due).
+ * ========================================================================== */
+
+.cockpit-schedule {
+  max-width: 880px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.cockpit-schedule-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  color: var(--text-soft);
+}
+.cockpit-schedule-hero svg {
+  color: var(--accent-strong);
+  flex-shrink: 0;
+}
+.cockpit-schedule-hero h1 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+}
+.cockpit-schedule-hero p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.cockpit-schedule-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px 20px;
+}
+.cockpit-schedule-section.accent-danger {
+  border-left: 3px solid var(--danger);
+}
+.cockpit-schedule-section.accent-accent {
+  border-left: 3px solid var(--accent-strong);
+}
+.cockpit-schedule-section.accent-soft {
+  border-left: 3px solid var(--border-strong);
+}
+.cockpit-schedule-section.accent-faint {
+  border-left: 3px solid var(--border-soft);
+}
+.cockpit-schedule-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.cockpit-schedule-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  flex: 1;
+}
+.cockpit-schedule-count {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.cockpit-schedule-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.cockpit-schedule-item {
+  display: grid;
+  grid-template-columns: 12px 110px 1fr 56px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border-soft);
+  font-size: 13.5px;
+}
+.cockpit-schedule-item:last-child { border-bottom: none; }
+.cockpit-schedule-item.is-done .cockpit-schedule-title { text-decoration: line-through; color: var(--text-faint); }
+.cockpit-schedule-day {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.cockpit-schedule-title {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cockpit-schedule-type {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cockpit-schedule-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  color: var(--text-faint);
+}
+.cockpit-schedule-empty svg { color: var(--text-faint); margin-bottom: 12px; }
+.cockpit-schedule-empty h2 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.cockpit-schedule-empty p { margin: 0; font-size: 13px; }
+.cockpit-schedule-empty code {
+  background: var(--surface-3);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}

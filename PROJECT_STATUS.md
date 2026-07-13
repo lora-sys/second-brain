@@ -34,6 +34,8 @@ _Last updated: 2026-07-12 by @coordinator_
 | #v0.4.c3 | Cockpit today panel (感悟/成就/关注) | Cockpit UI | @coordinator | merged | ✅ Done |
 | #v0.4.c4 | Cockpit right rail (任务与提醒 + 即将到来) | Cockpit UI | @coordinator | merged | ✅ Done |
 | #v0.4.c5 | Cockpit bottom row (捕获/收藏/记忆回顾) | Cockpit UI | @coordinator | merged | ✅ Done |
+| #v0.4.c6.schedule | Cockpit 日程 section (timeline) | Cockpit UI | @coordinator | merged | ✅ Done |
+| #v0.4.c6.* | 其他 5 个 placeholder section (笔记库/知识图谱/回顾/模板/智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |
 
 ## Backlog (v0.4, in dependency order)
 
