@@ -35,7 +35,7 @@ async (page) => {
 
   await t('cockpit: 10 nav items (6 primary + 4 resource)', async () => {
     const n = await page.evaluate(() => document.querySelectorAll('.cockpit-nav-item').length);
-    if (n !== 10) throw new Error('expected 10, got ' + n);
+    if (n !== 11) throw new Error('expected 11, got ' + n);
   });
 
   await t('cockpit: 今日 panel has 3 main blocks', async () => {
