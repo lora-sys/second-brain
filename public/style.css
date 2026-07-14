@@ -3963,3 +3963,22 @@ body.cockpit-mode .app { display: none !important; }
   0%, 100% { opacity: 0.6; }
   50% { opacity: 1; }
 }
+
+/* ============================================================================
+ * v0.10 — Recent Activity widget
+ * Streamed events on the dashboard.
+ * ========================================================================== */
+.cockpit-today-block.block-activity {
+  background: var(--surface-1);
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  padding: 14px 16px;
+  margin-top: 14px;
+}
+.block-activity .cockpit-list li {
+  font-size: 12px;
+}
+.block-activity .cockpit-list-meta {
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
