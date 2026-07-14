@@ -1822,6 +1822,7 @@
     if (route === 'tags') return 'tags';
     if (route === 'review') return 'review';
     if (route === 'knowledge') return 'knowledge';
+    if (route === 'templates') return 'templates';
     if (route === 'settings') return 'settings';
     if (route === 'review') return 'review';
     if (route === 'schedule') return 'schedule';
@@ -1837,6 +1838,7 @@
     if (route === 'tags') return 'tags';
     if (route === 'review') return 'review';
     if (route === 'knowledge') return 'knowledge';
+    if (route === 'templates') return 'templates';
     if (route === 'settings') return 'settings';
     if (route === 'schedule') return 'schedule';
     if (route === 'notes') return 'notes';

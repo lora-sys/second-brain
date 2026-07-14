@@ -147,6 +147,41 @@ async (page) => {
     if (kgEntry.soon) throw new Error('BUG: 知识图谱 still shows soon badge but renderKnowledge exists');
   });
 
+  // ---- 模板 ----
+  await page.goto(BASE + '/?cockpit=1#/templates');
+  await page.waitForTimeout(1500);
+  await t('templates: page renders', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.cockpit-templates'));
+    if (!has) throw new Error('templates page did not render');
+  });
+  await t('templates: hero shows template count', async () => {
+    const heroText = await page.evaluate(() => {
+      const hero = document.querySelector('.cockpit-templates-hero p');
+      return hero ? hero.textContent : '';
+    });
+    if (!heroText.includes('模板')) throw new Error('hero missing template count: ' + heroText);
+    if (!heroText.includes('类型')) throw new Error('hero missing type count: ' + heroText);
+  });
+  await t('templates: 4 type groups', async () => {
+    const n = await page.evaluate(() => document.querySelectorAll('.cockpit-template-group').length);
+    if (n !== 4) throw new Error('expected 4 groups, got ' + n);
+  });
+  await t('templates: at least 10 template cards', async () => {
+    const n = await page.evaluate(() => document.querySelectorAll('.cockpit-template-card').length);
+    if (n < 10) throw new Error('expected 10+ cards, got ' + n);
+  });
+  await t('cockpit: 模板 nav does NOT have soon badge', async () => {
+    const labels = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('.cockpit-nav-item')).map(el => ({
+        text: el.textContent.trim(),
+        soon: el.classList.contains('is-soon'),
+      }));
+    });
+    const tplEntry = labels.find(l => l.text.includes('模板'));
+    if (!tplEntry) throw new Error('no 模板 nav item');
+    if (tplEntry.soon) throw new Error('BUG: 模板 still shows soon badge but renderTemplates exists');
+  });
+
   // Bug-hunt: 回顾 sidebar must not show 'soon' badge.
   await page.goto(BASE + '/?cockpit=1');
   await page.waitForTimeout(1500);
