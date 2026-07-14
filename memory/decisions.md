@@ -306,3 +306,12 @@
 - **entityType guessing** — derives `person`/`task`/`project`/`link` from the parent directory name (`10-People/` → `person`, etc.).
 - **Daily journal integration** — file.changed events now show in the daily under "## 文件变化" with their paths. Users see "I edited 3 things in Obsidian" alongside app events.
 - **127 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.5.4 daily timeline shipped)
+
+- **7-day timeline grid** — replaces the flat history list at the top of the 日记 page. Each cell shows label (今天/昨天/N 天前) + date + ✓已生成/无 badge.
+- **Has-journal highlight** — accent left border + tinted badge on days with generated journals.
+- **Older collapsed** — journals >6 days old stay in a collapsed list below the timeline.
+- **Click-to-view** — every cell with a journal is clickable; opens the same viewer used for click on history list items.
+- **45/45 E2E pass** — 2 new tests cover the timeline (cells count, has-journal class).
+- **130 commits on main** — pushed to origin.
