@@ -285,3 +285,15 @@
 - **CSS total ~3500 lines, JS app.js ~1900 lines, cockpit.js ~1300 lines, tests ~200 lines**. Project is solid for v0.4.
 - **Memory promotion**: the LocalEchoProvider in lib/llm/index.mjs is the formal spec; the cockpit's inline agent is a UI preview that mirrors the same intent interface. When v0.5 wires the real LLM, the cockpit just swaps `agentComplete` (the inline one) for a call to the formal provider via the bridge.
 - **104 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.5 event stream + daily journal shipped)
+
+- **EventStore live** — JSONL append-only log under vaultRoot/.events/YYYY-MM-DD.jsonl. All CRUD handlers emit events; status transitions (task.todo→done) get specific event types. 7 events captured during smoke test.
+- **OpenAI-compatible provider wired** — POST /chat/completions with auth header, supports Ollama via OPENAI_BASE_URL=http://localhost:11434/v1. Reads API key + base URL + model from env.
+- **Daily journal generator shipped** — POST /api/daily reads last N days of events, picks provider (LocalEcho default, OpenAI if env set), generates markdown, atomic-writes to vaultRoot/00-Daily/YYYY-MM-DD.md. Frontmatter includes provider name + model so users always know which mode was active.
+- **Cockpit 日记 section** — new sidebar item. Status cards (provider / events today / journals total) + generate button + history list + viewer.
+- **Local-echo daily works without LLM** — keyword-matched fallback that produces structured markdown from event types. Good for testing and for users who don't want to wire Ollama.
+- **Privacy maintained** — events stay in vault; daily uses local-echo by default; OPENAI_API_KEY enables cloud LLM (user opt-in).
+- **41/41 E2E pass** — 7 new tests for daily + events endpoints.
+- **12 nav items total** (was 11) — added 日记.
+- **122 commits on main** — pushed to origin.
