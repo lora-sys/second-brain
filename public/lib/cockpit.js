@@ -267,8 +267,17 @@ let journals = [];
     }
     const latest = journals[0];
     let body = (latest.body || '').replace(/^#\s*[^\n]*\n/, '');  // Strip leading # heading only
-    const lines = body.split('\n').filter(function (l) { return l.trim().length > 0; });
-    const summary = lines.slice(0, 5).join('\n').slice(0, 400);
+    // v0.13: render as markdown using the same marked renderer the rest of the app uses
+    let rendered = '';
+    try {
+      if (window.marked) {
+        rendered = window.marked.parse(body);
+      } else {
+        rendered = '<pre>' + esc(body) + '</pre>';
+      }
+    } catch (e) {
+      rendered = '<pre>' + esc(body) + '</pre>';
+    }
     return [
       '<article class="cockpit-today-block block-insight">',
         '<header class="cockpit-block-header">',
@@ -276,9 +285,9 @@ let journals = [];
           '<h2 class="cockpit-block-title">最新周报</h2>',
           '<span class="cockpit-block-count">' + esc(latest.date) + '</span>',
         '</header>',
-        '<div class="cockpit-block-body">',
-          '<pre class="cockpit-insight-preview">' + esc(summary) + '</pre>',
-          '<a class="btn btn-ghost btn-sm" href="#/weekly" style="margin-top:10px; display:inline-block;">看完整周报 →</a>',
+        '<div class="cockpit-block-body cockpit-insight-rendered">',
+          rendered,
+          '<a class="btn btn-ghost btn-sm" href="#/weekly" style="margin-top:12px; display:inline-block;">看完整周报 →</a>',
         '</div>',
       '</article>'
     ].join('');
