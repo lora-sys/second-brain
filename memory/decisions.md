@@ -485,3 +485,8 @@
 
 - **Dashboard activity widget** — loads last 8 events from /api/events, displays as type-colored rows with Chinese labels. Type-to-label mapping covers all event types (task.created, task.done, file.changed, daily.generated, etc.).
 - **202 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.11 MCP server shipped)
+
+- **MCP server (ADR-0006)** — JSON-RPC 2.0 over stdio. 4 tools: list_entities, get_entity, search_entities, create_entity. Reuses the Vault class. Privacy: local-only.
+- **203 commits on main** — pushed to origin.
