@@ -365,3 +365,10 @@
 - **52 E2E tests + 49 Rust unit tests = 101 tests passing**.
 - **GitHub Actions will produce** .deb + AppImage + .rpm + raw binary + draft release.
 - **150 commits on main** — all pushed to origin.
+
+## 2026-07-14 (v0.6.3 + v0.6.4 — search scoring + canvas graph)
+
+- **v0.6.3 — Weighted search** — search endpoint now scores entities (title=100/30, tag=25/10, body=5/match, recency +0-10). Multi-token AND semantics. Returns `{items, scores, total}`. UI shows score badges.
+- **v0.6.4 — Canvas force-directed graph** — new "关系图" tab in 知识图谱. Pure vanilla JS, no deps. Two new modules: `graphforce.mjs` (Fruchterman-Reingold simulation), `graphview.mjs` (canvas rendering with hover, drag, click-to-navigate). Type-colored nodes, edge connections, top-left legend.
+- **56/56 E2E pass** (was 52 before).
+- **154 commits on main** — pushed to origin.
