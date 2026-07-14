@@ -372,3 +372,12 @@
 - **v0.6.4 — Canvas force-directed graph** — new "关系图" tab in 知识图谱. Pure vanilla JS, no deps. Two new modules: `graphforce.mjs` (Fruchterman-Reingold simulation), `graphview.mjs` (canvas rendering with hover, drag, click-to-navigate). Type-colored nodes, edge connections, top-left legend.
 - **56/56 E2E pass** (was 52 before).
 - **154 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.6.5 — canvas zoom/pan polish)
+
+- **Mouse wheel zooms** the graph (0.2x to 3x, zooms toward cursor)
+- **Click-and-drag on empty space pans** the view
+- **Edge highlight marker** (small purple dot at midpoint) when hovering connected nodes
+- Hit-testing math correctly applies inverse pan/zoom so click/drag still work after zooming
+- 56/56 E2E pass throughout
+- 158 commits on main — pushed to origin
