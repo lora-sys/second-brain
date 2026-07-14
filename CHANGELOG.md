@@ -38,10 +38,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `POST /api/daily { days, date }` — generate today's journal
 - `GET /api/daily/YYYY-MM-DD` — read a specific journal
 
+### v0.5.5 — Agent tool-use
+- Local-echo agent can now perform actions (create_task, mark_done) alongside text responses.
+- Action results shown inline as green ✓ rows.
+- 2 new quick prompts: '新建任务: ...' + '把最新任务标完成'.
+
+### v0.6 — Knowledge Graph enhancements
+- **Backlinks panel** on every entity detail page (引用了 / 被引用 two-column layout).
+- Resolution matches id, type/slug, slug, or title — handles all wikilink styles.
+- 30s cached bodies via `_fullEntitiesCache` for backlink computation.
+
+### v0.6.1 — Daily timeline auto-refresh
+- After '生成今天的日记' click, page re-navigates so today's cell shows ✓ 已生成 badge immediately.
+
+### v0.6.2 — Agent conversation persistence
+- localStorage key `sb-agent-history-v1`. Conversation survives reloads.
+- '清空历史' button (visible only when history exists).
+
 ### Test coverage
-- 45 E2E tests pass (was 41 before v0.5.4)
+- 52 E2E tests pass (was 41 before v0.5.0; +11 across v0.5 + v0.6 rounds)
 - 49 Rust unit tests pass 5/5 (unchanged)
 - Standard v3 mode + cockpit mode regression passes
+- Milestone test: `cockpit: NO soon badges remain anywhere in sidebar`
 
 ## [0.4.0] - 2026-07-13
 
