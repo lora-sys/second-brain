@@ -1788,6 +1788,7 @@
   window.__renderProjects = renderProjects;
   window.__renderLinks = renderLinks;
   window.__refreshCounts = refreshCounts;
+  window.toast = toast;
   window.openQuickAdd = openQuickAdd;
   window.openImportLinkModal = openImportLinkModal;
   window.openCmdK = openCmdK;
@@ -1822,6 +1823,7 @@
     if (route === 'tags') return 'tags';
     if (route === 'review') return 'review';
     if (route === 'knowledge') return 'knowledge';
+    if (route === 'daily') return 'daily';
     if (route === 'templates') return 'templates';
     if (route === 'agent') return 'agent';
     if (route === 'settings') return 'settings';
@@ -1839,6 +1841,7 @@
     if (route === 'tags') return 'tags';
     if (route === 'review') return 'review';
     if (route === 'knowledge') return 'knowledge';
+    if (route === 'daily') return 'daily';
     if (route === 'templates') return 'templates';
     if (route === 'agent') return 'agent';
     if (route === 'settings') return 'settings';

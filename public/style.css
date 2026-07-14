@@ -3297,3 +3297,89 @@ body.cockpit-mode .app { display: none !important; }
 }
 .cockpit-agent-quick-btn:hover { background: var(--surface-3); }
 #agent-send { white-space: nowrap; }
+
+/* ============================================================================
+ * v0.5 — Cockpit Daily Journal Section
+ * Generates daily markdown from event stream. Local-echo by default,
+ * OpenAI/Ollama when configured.
+ * ========================================================================== */
+
+.cockpit-daily { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.cockpit-daily-hero {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 18px 22px; background: var(--surface-1);
+  border-radius: 12px; border: 1px solid var(--border-soft);
+}
+.cockpit-daily-hero svg { color: var(--accent-strong); flex-shrink: 0; margin-top: 2px; }
+.cockpit-daily-hero h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+.cockpit-daily-hero p { margin: 0; color: var(--text-soft); font-size: 13px; }
+
+.cockpit-daily-status {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+.cockpit-daily-status-card {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 14px; background: var(--surface-1);
+  border-radius: 10px; border: 1px solid var(--border-soft);
+}
+.cockpit-daily-status-label {
+  font-size: 11px; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.cockpit-daily-status-value {
+  font-size: 16px; font-weight: 600; font-family: var(--font-mono);
+}
+
+.cockpit-daily-actions {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; background: var(--surface-1);
+  border-radius: 10px; border: 1px solid var(--border-soft);
+}
+.cockpit-daily-actions-hint {
+  font-size: 12px; color: var(--text-soft);
+}
+.cockpit-daily-actions-hint code {
+  font-family: var(--font-mono); background: var(--surface-2);
+  padding: 2px 6px; border-radius: 4px; font-size: 11px;
+}
+
+.cockpit-daily-history h2 {
+  margin: 0 0 12px; font-size: 14px; font-weight: 600;
+  color: var(--text-soft); text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cockpit-daily-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+.cockpit-daily-list-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: var(--surface-1);
+  border-radius: 8px; border: 1px solid var(--border-soft);
+  text-decoration: none; color: var(--text);
+  font-size: 13px; font-family: var(--font-mono);
+  transition: background 0.15s;
+}
+.cockpit-daily-list-item:hover { background: var(--surface-2); }
+.cockpit-daily-list-arrow { color: var(--text-soft); }
+
+.cockpit-daily-empty {
+  padding: 30px 16px; background: var(--surface-1);
+  border-radius: 8px; border: 1px solid var(--border-soft);
+  text-align: center; color: var(--text-soft);
+}
+
+.cockpit-daily-view {
+  padding: 16px 18px; background: var(--surface-1);
+  border-radius: 10px; border: 1px solid var(--border-soft);
+}
+.cockpit-daily-view h2 {
+  margin: 0 0 12px; font-size: 16px; font-weight: 600;
+}
+.cockpit-daily-view-content {
+  margin: 0; padding: 14px; background: var(--surface-2);
+  border-radius: 8px; font-family: var(--font-mono);
+  font-size: 12px; line-height: 1.6; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 480px; overflow: auto;
+}
