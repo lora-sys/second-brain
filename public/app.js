@@ -1659,17 +1659,22 @@
       const q = input.value.trim();
       if (!q) { close(); return; }
       try {
-        const { items } = await api.search(q);
+        const { items, scores, total } = await api.req('/api/search?q=' + encodeURIComponent(q));
         state.searchResults = items.slice(0, 12);
         state.searchActiveIndex = -1;
         if (!items.length) {
           results.innerHTML = `<div class="search-result"><div class="search-result-meta">无结果</div></div>`;
         } else {
-          results.innerHTML = items.slice(0, 12).map((it, i) => {
+          const totalLabel = total > items.length ? `前 ${items.length} / 共 ${total} ` : `${total} 个结果`;
+          const header = `<div class="search-result-header">${escapeHtml(totalLabel)}</div>`;
+          results.innerHTML = header + items.slice(0, 12).map((it, i) => {
             const t = it.type;
+            const score = (scores && scores[i] != null) ? scores[i] : null;
+            const scoreHtml = score != null ? `<span class="search-result-score">${score}</span>` : '';
             return `<div class="search-result ${i === state.searchActiveIndex ? 'is-active' : ''}" data-id="${escapeHtml(it.id)}" data-index="${i}">
               <span class="search-result-type ${t}">${typeLabel(t).slice(0, 1)}</span>
               <span class="search-result-title">${escapeHtml(it.data.title || it.data.name || it.slug)}</span>
+              ${scoreHtml}
               <span class="search-result-meta">${fmtDateTime(it.data.updated)}</span>
             </div>`;
           }).join('');

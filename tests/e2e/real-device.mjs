@@ -412,6 +412,23 @@ async (page) => {
     });
     if (n < 0) throw new Error('entities did not return items array');
   });
+  await t('search: weighted search returns scored results', async () => {
+    const r = await page.evaluate(async () => {
+      const x = await fetch('/api/search?q=alice');
+      const d = await x.json();
+      return { hasItems: Array.isArray(d.items) && d.items.length > 0, hasScores: Array.isArray(d.scores) && d.scores.length > 0, firstScore: d.scores && d.scores[0] };
+    });
+    if (!r.hasItems) throw new Error('search returned no items');
+    if (!r.hasScores) throw new Error('search did not return scores');
+    if (r.firstScore < 50) throw new Error('expected first score ≥ 50 for alice, got ' + r.firstScore);
+  });
+  await t('search: empty query returns empty', async () => {
+    const r = await page.evaluate(async () => {
+      const x = await fetch('/api/search?q=');
+      return x.status;
+    });
+    if (r !== 200) throw new Error('expected 200, got ' + r);
+  });
 
   tally.ended = Date.now();
   tally.duration_ms = tally.ended - tally.started;
