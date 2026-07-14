@@ -4009,3 +4009,50 @@ body.cockpit-mode .app { display: none !important; }
   overflow: auto;
   margin-bottom: 0;
 }
+
+/* ============================================================================
+ * v0.13 — Insight preview as markdown
+ * ========================================================================== */
+.cockpit-insight-rendered {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  max-height: 280px;
+  overflow: auto;
+  padding: 8px 0;
+}
+.cockpit-insight-rendered h1,
+.cockpit-insight-rendered h2,
+.cockpit-insight-rendered h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 8px 0 4px;
+  color: var(--text);
+}
+.cockpit-insight-rendered h1 { font-size: 17px; }
+.cockpit-insight-rendered ul,
+.cockpit-insight-rendered ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+.cockpit-insight-rendered li {
+  margin: 2px 0;
+}
+.cockpit-insight-rendered p {
+  margin: 4px 0;
+}
+.cockpit-insight-rendered em {
+  color: var(--text-soft);
+  font-style: italic;
+}
+.cockpit-insight-rendered strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.cockpit-insight-rendered code {
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
