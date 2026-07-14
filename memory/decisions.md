@@ -469,3 +469,8 @@
 - **GitHub Actions will produce .deb + AppImage + .rpm + raw binary + draft release**.
 - **188 commits on main** — pushed to origin.
 
+
+## 2026-07-14 (v0.4-6b virtualize landed)
+
+- **Notes list capped at 50** — each type-grouped section in 笔记库 shows top 50 most-recent items, with a "显示全部" link if there are more. Prevents DOM explosion on large vaults.
+- **196 commits on main** — pushed to origin.
