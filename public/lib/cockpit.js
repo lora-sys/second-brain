@@ -1717,7 +1717,25 @@
     }
   }
 
-    // -------------------- Daily journal helpers (v0.5) --------------------
+    // -------------------- Knowledge graph: canvas view (v0.6.4) --------------------
+  let _graphView = null; // active GraphView instance, or null
+  async function renderKnowledgeCanvas(g) {
+    // Lazy-load the GraphView module (uses dynamic import to keep first-paint fast)
+    const mod = await import('./graphview.mjs');
+    const container = document.getElementById('cockpit-knowledge-canvas');
+    if (!container) return;
+    // Tear down old
+    if (_graphView) { _graphView.stop(); _graphView = null; }
+    container.innerHTML = '<canvas id="cockpit-graph-canvas"></canvas>';
+    const canvas = container.querySelector('canvas');
+    const gv = new mod.GraphView(canvas, g);
+    gv.onNodeClick = (id) => {
+      location.hash = '#/entity/' + encodeURIComponent(id);
+    };
+    _graphView = gv;
+  }
+
+  // -------------------- Daily journal helpers (v0.5) --------------------
   async function renderDaily(state) {
     // Fetch list of recent journals
     let journals = [];
@@ -1989,6 +2007,10 @@
           '<h1>知识图谱</h1>',
           '<p>' + g.nodes.length + ' 个 entities · ' + totalConnections + ' 条连接 · ' + connectedNodes + ' 个有连接的节点</p>',
         '</div>',
+        '<div class="cockpit-knowledge-view-toggle">',
+          '<button class="btn btn-ghost btn-sm is-active" data-graph-view="list">列表</button>',
+          '<button class="btn btn-ghost btn-sm" data-graph-view="canvas">关系图</button>',
+        '</div>',
       '</header>'
     ].join('');
     // Top hubs (top 5)
@@ -2046,13 +2068,45 @@
     const main = connectedNodes === 0
       ? '<div class="cockpit-knowledge-empty"><p>没有任何连接。在 entry 里用 <code>[[type/slug]]</code> 互相引用,或者共享标签就能建图。</p></div>'
       : '<div class="cockpit-knowledge-hubs">' + hubsHtml + '</div>';
+    const canvasContainer = '<section class="cockpit-knowledge-canvas-wrap" id="cockpit-knowledge-canvas-wrap" style="display:none;"><div id="cockpit-knowledge-canvas"></div></section>';
     return [
       '<div class="cockpit-knowledge">',
         hero,
         clusterHtml,
         main,
+        canvasContainer,
       '</div>'
     ].join('');
+  }
+
+  // Bind the view toggle (list / canvas) on the knowledge page.
+  function bindKnowledgeViewToggle(state) {
+    const content = document.getElementById('main') || document.getElementById('cockpit-content');
+    if (!content) return;
+    const toggle = content.querySelector('.cockpit-knowledge-view-toggle');
+    if (!toggle) return;
+    toggle.querySelectorAll('[data-graph-view]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.getAttribute('data-graph-view');
+        toggle.querySelectorAll('[data-graph-view]').forEach(b => b.classList.toggle('is-active', b === btn));
+        const hubs = content.querySelector('.cockpit-knowledge-hubs');
+        const clusters = content.querySelector('.cockpit-knowledge-clusters');
+        const canvasWrap = content.querySelector('#cockpit-knowledge-canvas-wrap');
+        if (view === 'canvas') {
+          if (hubs) hubs.style.display = 'none';
+          if (clusters) clusters.style.display = 'none';
+          if (canvasWrap) canvasWrap.style.display = 'block';
+          // Build graph and render canvas
+          const g = buildGraph(state);
+          renderKnowledgeCanvas(g);
+        } else {
+          if (hubs) hubs.style.display = '';
+          if (clusters) clusters.style.display = '';
+          if (canvasWrap) canvasWrap.style.display = 'none';
+          if (_graphView) { _graphView.stop(); _graphView = null; }
+        }
+      });
+    });
   }
 
     // Resolve the dynamic content target: prefer the adopted <main id="main">
@@ -2097,6 +2151,7 @@
       }
       if (route === 'knowledge') {
         content.innerHTML = renderKnowledge(state);
+        bindKnowledgeViewToggle(state);
         return;
       }
       if (route === 'daily') {

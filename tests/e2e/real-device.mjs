@@ -135,6 +135,16 @@ async (page) => {
     const n = await page.evaluate(() => document.querySelectorAll('.cockpit-knowledge-hub').length);
     if (n === 0) throw new Error('no hubs');
   });
+  await t('knowledge: canvas view toggle exists', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('[data-graph-view="canvas"]'));
+    if (!has) throw new Error('no canvas view toggle');
+  });
+  await t('knowledge: clicking canvas shows graph canvas', async () => {
+    await page.evaluate(() => document.querySelector('[data-graph-view="canvas"]').click());
+    await page.waitForTimeout(1500);
+    const has = await page.evaluate(() => !!document.getElementById('cockpit-graph-canvas'));
+    if (!has) throw new Error('canvas not rendered');
+  });
   await t('cockpit: 知识图谱 nav does NOT have soon badge', async () => {
     const labels = await page.evaluate(() => {
       return Array.from(document.querySelectorAll('.cockpit-nav-item')).map(el => ({
