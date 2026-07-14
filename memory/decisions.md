@@ -265,3 +265,13 @@
 - **Seed data touched** — added 16 wikilinks across 5 entities to make the graph meaningful. This is a local-only seed change (Obsidian Vault), not committed.
 - **No canvas, no force-directed graph** — kept it as a text-list of hubs + edges. v0.6 will add the canvas.
 - **90 commits on main** — ahead of origin by 90.
+
+## 2026-07-14 (v0.4.c6.模板 templates shipped)
+
+- **12 starter templates grouped by type** — 3 per type (人物/任务/项目/链接). Covers the most common starting points: 同事/朋友/家人, 默认任务/复盘/会议, 副业/工作/研究, 文章/工具/视频.
+- **Templates live in JS, not vault** — keeps them available even when the vault is empty. Trade-off: can't edit from Obsidian. Acceptable for v0.4.
+- **`window.prompt` for "使用模板" title input** — ugly but functional. Filed v0.4.c6.x: dedicated modal with title + first-line-of-body preview.
+- **Copy-body action via clipboard API** — falls back gracefully if clipboard write fails (toast error).
+- **28/28 E2E tests pass** — 5 new tests cover the templates page (renders, hero counts, 4 groups, 10+ cards, no SOON badge).
+- **Only 智能体 placeholder remains** — 11 of 12 cockpit sections are now real implementations.
+- **98 commits on main** — ahead of origin.
