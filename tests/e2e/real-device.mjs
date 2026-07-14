@@ -265,7 +265,7 @@ async (page) => {
     const input = await page.evaluate(() => !!document.getElementById('agent-input'));
     if (!input) throw new Error('no composer input');
     const n = await page.evaluate(() => document.querySelectorAll('.cockpit-agent-quick-btn').length);
-    if (n !== 5) throw new Error('expected 5 quick prompts, got ' + n);
+    if (n !== 7) throw new Error('expected 7 quick prompts, got ' + n);
   });
   await t('agent: clicking quick prompt produces assistant reply', async () => {
     // Click the "我有哪些未完成任务?" quick prompt
@@ -293,6 +293,20 @@ async (page) => {
     const agEntry = labels.find(l => l.text.includes('智能体'));
     if (!agEntry) throw new Error('no 智能体 nav item');
     if (agEntry.soon) throw new Error('BUG: 智能体 still shows soon badge but renderAgent exists');
+  });
+  // Tool-use: clicking '新建任务' quick prompt executes create_task action
+  await t('agent: tool-use create_task executes action', async () => {
+    await page.evaluate(() => {
+      const btns = document.querySelectorAll('.cockpit-agent-quick-btn');
+      // The '新建任务: ...' is the 6th button (index 5)
+      btns[5].click();
+    });
+    await page.waitForTimeout(1500);
+    const actions = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('.cockpit-agent-action')).map(a => a.textContent.trim())
+    );
+    if (actions.length === 0) throw new Error('no action results');
+    if (!actions.some(a => a.includes('create_task'))) throw new Error('expected create_task action, got: ' + JSON.stringify(actions));
   });
   // Re-navigate to fresh daily page to ensure timeline renders
   await page.goto(BASE + '/?cockpit=1#/daily');
