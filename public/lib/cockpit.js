@@ -2723,10 +2723,25 @@
     return document.getElementById('main') || document.getElementById('cockpit-content');
   }
 
+  // Render a content-aware skeleton for the current route (v0.4-6a).
+  function renderCockpitSkeleton(content, route) {
+    const shapes = {
+      'tags': '<div class="cockpit-skeleton">' + Array.from({ length: 12 }, () => '<span class="skeleton-chip"></span>').join('') + '</div>',
+      'notes': '<div class="cockpit-skeleton">' + Array.from({ length: 8 }, () => '<div class="skeleton-row"><span class="skeleton-dot"></span><span class="skeleton-line"></span></div>').join('') + '</div>',
+      'agent': '<div class="cockpit-skeleton"><div class="skeleton-hero"></div><div class="skeleton-grid">' + Array.from({ length: 4 }, () => '<div class="skeleton-card"></div>').join('') + '</div></div>',
+      'daily': '<div class="cockpit-skeleton">' + Array.from({ length: 5 }, () => '<div class="skeleton-block"></div>').join('') + '</div>',
+      'weekly': '<div class="cockpit-skeleton">' + Array.from({ length: 6 }, () => '<div class="skeleton-block"></div>').join('') + '</div>',
+      'decisions': '<div class="cockpit-skeleton">' + Array.from({ length: 4 }, () => '<div class="skeleton-block"></div>').join('') + '</div>',
+      'skills': '<div class="cockpit-skeleton">' + Array.from({ length: 4 }, () => '<div class="skeleton-block"></div>').join('') + '</div>',
+    };
+    content.innerHTML = shapes[route] || shapes['notes'];
+  }
+
   async function renderContent(route, hash) {
     const content = renderTarget();
     if (!content) return;
     setActive(hash || location.hash || '#/dashboard');
+    renderCockpitSkeleton(content, route);
     try {
       if (route === 'dashboard' || route === '' || !route) {
         content.innerHTML = renderTodayPanel();
