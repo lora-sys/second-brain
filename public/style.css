@@ -3537,3 +3537,28 @@ body.cockpit-mode .app { display: none !important; }
   font-family: var(--font-mono);
   text-transform: uppercase;
 }
+
+/* ============================================================================
+ * v0.6.3 — Weighted search
+ * Score badge + total count in search results.
+ * ========================================================================== */
+.search-result-header {
+  padding: 6px 12px;
+  font-size: 10px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border-soft);
+  font-weight: 600;
+}
+.search-result-score {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: var(--accent-soft, rgba(124,58,237,0.1));
+  color: var(--accent-strong, #7c3aed);
+  border-radius: 8px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
