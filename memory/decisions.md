@@ -404,3 +404,9 @@
 - **64/64 E2E pass** (was 56, +4 weekly tests + 1 nav-count bump from 12→13).
 - **Privacy preserved** — local-echo by default, OPENAI_API_KEY opt-in.
 - **164 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.7.0-alpha released)
+
+- **v0.7.0-alpha tagged and pushed** — Phase 4 of roadmap (Reflection) starts.
+- **Weekly reflection** is the first deliverable. Decision journal (v0.8) next.
+- **66 commits on main** — pushed to origin.
