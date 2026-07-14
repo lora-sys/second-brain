@@ -453,3 +453,19 @@
 - **routeImplFor bug fix** — `skills` was missing from the route impl map (only in `__appRouteImpl`); added to both so hashchange correctly routes to the skills renderContent.
 - **14 nav items total** (was 13). Cockpit now has 1 more section.
 - **186 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.9.0 RELEASED — final)
+
+- **v0.9.0 tagged and pushed** — final release of the v0.9 line.
+- **Major features since v0.5.0**:
+  - Event stream + Daily Memory (v0.5)
+  - FS watcher for external vault changes
+  - Knowledge Graph v2: backlinks, weighted search, force-directed canvas
+  - Weekly reflection (v0.7) with stale task detection
+  - Decision Journal (v0.8) with 30-day retrospective
+  - Personal Agent + Skills (v0.9): markdown instruction sets, chip bar, save-skill, skill loader, skills management page
+- **78 E2E + 49 Rust unit = 127 tests passing**.
+- **14 cockpit sections, all real, no soon placeholders**.
+- **GitHub Actions will produce .deb + AppImage + .rpm + raw binary + draft release**.
+- **188 commits on main** — pushed to origin.
+
