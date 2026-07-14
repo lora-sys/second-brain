@@ -432,3 +432,16 @@
 - **76 E2E + 49 Rust unit = 125 tests passing**.
 - **Phase 5 of roadmap (Personal Agent + Skill distillation) starting**. v0.9.x will add the loader, then v0.9.0 release.
 - **176 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.9.0-alpha released)
+
+- **v0.9.0-alpha tagged and pushed** — Phase 5 of roadmap (Personal Agent + Skills) starts.
+- **Major features**:
+  - Skills system (markdown instruction sets in vault/00-AI/skills/)
+  - 3 new endpoints: GET/POST /api/skills, GET /api/skills/:slug
+  - Skill chip bar in cockpit agent + save-skill modal
+  - Skill loader: auto-inject matched skills into agent prompt
+  - "N skill(s) 注入" indicator in response meta
+- **78 E2E + 49 Rust unit = 127 tests passing**.
+- **Roadmap Phase 5 partial**. Full Personal Agent still pending.
+- **180 commits on main** — pushed to origin.
