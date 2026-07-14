@@ -315,3 +315,18 @@
 - **Click-to-view** — every cell with a journal is clickable; opens the same viewer used for click on history list items.
 - **45/45 E2E pass** — 2 new tests cover the timeline (cells count, has-journal class).
 - **130 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.5.0-alpha released)
+
+- **v0.5.0-alpha tagged and pushed** — `v0.5.0-alpha` → origin. GitHub Actions will build .deb + AppImage + .rpm + raw binary + create draft release.
+- **Major features in this release**:
+  - Event store (JSONL append-only)
+  - File system watcher (Obsidian edits picked up)
+  - Daily journal generator (LocalEcho + OpenAI-compatible)
+  - Cockpit 日记 section with 7-day timeline
+- **45/45 E2E tests pass**
+- **Privacy-first**:
+  - Events stay in vault under `.events/`
+  - Daily uses LocalEcho by default (no LLM needed)
+  - OPENAI_API_KEY enables cloud LLM (opt-in)
+- **134 commits on main** — pushed to origin.
