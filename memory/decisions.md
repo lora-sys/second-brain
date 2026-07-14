@@ -480,3 +480,8 @@
 - **Type-aware skeleton states** replace the generic spinner in both standard and cockpit modes. 4+7 route-specific shapes (tags chips, notes rows, agent hero+grid, daily/weekly blocks, decisions/skills blocks).
 - **Pure CSS** shimmer + pulse animations. No new deps.
 - **200 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.10 Recent Activity widget)
+
+- **Dashboard activity widget** — loads last 8 events from /api/events, displays as type-colored rows with Chinese labels. Type-to-label mapping covers all event types (task.created, task.done, file.changed, daily.generated, etc.).
+- **202 commits on main** — pushed to origin.
