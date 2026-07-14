@@ -394,3 +394,13 @@
   - Agent conversation persistence in localStorage
 - **56 E2E + 49 Rust unit = 105 tests passing**.
 - **160 commits on main** — all pushed to origin.
+
+## 2026-07-14 (v0.7 weekly reflection shipped)
+
+- **周报 (Weekly Reflection)** section shipped — new sidebar item, second from the daily journal.
+- **6 sections per weekly**: 本周焦点 / 完成的事 / 进展中的事 / 被忽略的信号 / 陈旧任务 / 下周看什么.
+- **Stale task detection** — finds open tasks not updated in 7+ days.
+- **Atomic write** to `00-Weekly/YYYY-MM-DD.md` (same pattern as daily).
+- **64/64 E2E pass** (was 56, +4 weekly tests + 1 nav-count bump from 12→13).
+- **Privacy preserved** — local-echo by default, OPENAI_API_KEY opt-in.
+- **164 commits on main** — pushed to origin.
