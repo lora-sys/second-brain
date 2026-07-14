@@ -333,10 +333,24 @@
     return { name: h.replace(/^#\//, '') || 'dashboard', params: {} };
   }
 
+  // Render a content-aware skeleton while route is loading
+  // (v0.4-6a: replace generic spinner with shaped placeholders).
+  function renderSkeleton(main, routeName) {
+    const shapes = {
+      'tags': () => Array.from({ length: 12 }, () => '<span class="skeleton-chip"></span>').join(''),
+      'notes': () => Array.from({ length: 8 }, () => '<div class="skeleton-row"><span class="skeleton-dot"></span><span class="skeleton-line"></span></div>').join(''),
+      'agent': () => '<div class="skeleton-hero"></div><div class="skeleton-grid">' + Array.from({ length: 4 }, () => '<div class="skeleton-card"></div>').join('') + '</div>',
+      'daily': () => Array.from({ length: 5 }, () => '<div class="skeleton-block"></div>').join(''),
+      'weekly': () => Array.from({ length: 6 }, () => '<div class="skeleton-block"></div>').join(''),
+    };
+    const shape = (shapes[routeName] || shapes['notes'])();
+    main.innerHTML = '<div class="cockpit-skeleton">' + shape + '</div>';
+  }
+
   async function handleRoute() {
     const r = parseHash();
     const main = $('#main');
-    main.innerHTML = `<div class="empty"><div class="spinner"></div></div>`;
+    renderSkeleton(main, r.name);
     try {
       await refreshCounts();
       if (r.name === 'entity') await renderEntity(r.params.id);
