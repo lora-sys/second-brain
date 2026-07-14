@@ -1925,6 +1925,7 @@
     if (route === 'templates') return 'templates';
     if (route === 'agent') return 'agent';
     if (route === 'decisions') return 'decisions';
+    if (route === 'skills') return 'skills';
     if (route === 'settings') return 'settings';
     if (route === 'review') return 'review';
     if (route === 'schedule') return 'schedule';
@@ -1945,6 +1946,7 @@
     if (route === 'templates') return 'templates';
     if (route === 'agent') return 'agent';
     if (route === 'decisions') return 'decisions';
+    if (route === 'skills') return 'skills';
     if (route === 'settings') return 'settings';
     if (route === 'schedule') return 'schedule';
     if (route === 'notes') return 'notes';

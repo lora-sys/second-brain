@@ -31,6 +31,7 @@
     { hash: '#/tags', label: '标签', icon: 'tag', impl: 'tags' },
     { hash: '#/agent', label: '智能体', icon: 'sparkle', impl: 'agent' },
     { hash: '#/decisions', label: '决策', icon: 'check', impl: 'decisions' },
+    { hash: '#/skills', label: 'Skills', icon: 'sparkle', impl: 'skills' },
     { hash: '#/settings', label: '设置', icon: 'settings', impl: 'settings' },
   ];
 
@@ -2322,6 +2323,152 @@
     })();
   }
 
+  // -------------------- Skills manager (v0.9.x) --------------------
+  async function renderSkills(state) {
+    let skills = [];
+    try {
+      const r = await window.__api.api.get('/api/skills');
+      skills = (r && r.skills) || [];
+    } catch (e) { console.warn('[skills] list failed:', e.message); }
+    const hero = [
+      '<header class="cockpit-skills-hero">',
+        icon('sparkle', 24),
+        '<div>',
+          '<h1>Skills</h1>',
+          '<p>可复用的指令集。agent 收到 prompt 时会按关键字匹配,自动注入。</p>',
+        '</div>',
+        '<button class="btn btn-primary" id="skill-new-btn">新建 skill</button>',
+      '</header>'
+    ].join('');
+    const totalCount = skills.length;
+    const tagCounts = {};
+    for (const s of skills) {
+      for (const t of (s.tags || [])) tagCounts[t] = (tagCounts[t] || 0) + 1;
+    }
+    const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const tagChipsHtml = topTags.length > 0
+      ? '<div class="cockpit-skills-tags">' + topTags.map(([t, n]) =>
+          '<span class="cockpit-skills-tag">#' + esc(t) + ' <span class="cockpit-skills-tag-count">' + n + '</span></span>'
+        ).join('') + '</div>'
+      : '';
+    const statusCards = [
+      '<section class="cockpit-skills-status">',
+        '<div class="cockpit-skills-status-card">',
+          '<span class="cockpit-skills-status-label">总数</span>',
+          '<span class="cockpit-skills-status-value">' + totalCount + '</span>',
+        '</div>',
+        '<div class="cockpit-skills-status-card">',
+          '<span class="cockpit-skills-status-label">标签</span>',
+          '<span class="cockpit-skills-status-value">' + Object.keys(tagCounts).length + '</span>',
+        '</div>',
+      '</section>'
+    ].join('');
+    const list = skills.length === 0
+      ? '<div class="cockpit-skills-empty"><p>还没有 skill。在 智能体 页面对话后点「保存当前对话为 skill」,或者点右上「新建 skill」。</p></div>'
+      : '<div class="cockpit-skills-list">' + skills.map(s => {
+          const bodyPreview = (s.description || '').slice(0, 120);
+          return '<div class="cockpit-skills-item" data-skill-slug="' + esc(s.slug) + '">' +
+            '<div class="cockpit-skills-item-header">' +
+              '<span class="cockpit-skills-item-emoji">⚡</span>' +
+              '<span class="cockpit-skills-item-name">' + esc(s.name || s.slug) + '</span>' +
+              '<span class="cockpit-skills-item-slug">' + esc(s.slug) + '</span>' +
+            '</div>' +
+            (bodyPreview ? '<div class="cockpit-skills-item-desc">' + esc(bodyPreview) + '</div>' : '') +
+            ((s.tags || []).length > 0
+              ? '<div class="cockpit-skills-item-tags">' +
+                  s.tags.map(t => '<span class="cockpit-skills-item-tag">#' + esc(t) + '</span>').join('') +
+                '</div>'
+              : '') +
+          '</div>';
+        }).join('') + '</div>';
+    return ['<div class="cockpit-skills">', hero, tagChipsHtml, statusCards, list, '</div>'].join('');
+  }
+
+  function bindSkillsActions(content) {
+    const newBtn = content.querySelector('#skill-new-btn');
+    if (newBtn) newBtn.addEventListener('click', () => openSkillEditorModal());
+    content.querySelectorAll('[data-skill-slug]').forEach(item => {
+      item.addEventListener('click', () => {
+        openSkillEditorModal(item.getAttribute('data-skill-slug'));
+      });
+    });
+  }
+
+  function openSkillEditorModal(existingSlug) {
+    function populateSkillModal(skill) {
+      const html = '<div class="editor">' +
+        '<div class="editor-row"><label>名称</label><input id="sk-name" placeholder="比如:总结一周活动" /></div>' +
+        '<div class="editor-row"><label>Slug (URL 标识)</label><input id="sk-slug" placeholder="自动从名称生成" /></div>' +
+        '<div class="editor-row"><label>描述</label><input id="sk-desc" placeholder="一句话说明这个 skill 做什么" /></div>' +
+        '<div class="editor-row"><label>标签 (逗号分隔)</label><input id="sk-tags" placeholder="weekly, summary, events" /></div>' +
+        '<div class="editor-row"><label>Body (markdown)</label><textarea id="sk-body" rows="10"></textarea></div>' +
+      '</div>';
+      if (typeof window.openModal !== 'function') return;
+      const footer = (skill ? '<button class="btn btn-danger" id="sk-delete">删除</button>' : '') +
+        '<button class="btn" data-close>取消</button><button class="btn btn-primary" id="sk-save">保存</button>';
+      window.openModal({
+        title: skill ? '编辑 skill: ' + (skill.name || skill.slug) : '新建 skill',
+        type: 'skill',
+        body: html,
+        footer: footer
+      });
+      setTimeout(() => {
+        if (skill) {
+          document.getElementById('sk-name').value = skill.name || '';
+          document.getElementById('sk-slug').value = skill.slug || '';
+          document.getElementById('sk-desc').value = skill.description || '';
+          document.getElementById('sk-tags').value = (skill.tags || []).join(', ');
+          document.getElementById('sk-body').value = skill.body || '';
+        }
+        const save = document.getElementById('sk-save');
+        if (save) save.addEventListener('click', async () => {
+          const name = (document.getElementById('sk-name').value || '').trim();
+          let slug = (document.getElementById('sk-slug').value || '').trim();
+          if (!slug) {
+            slug = name.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || ('skill-' + Date.now());
+          }
+          const desc = (document.getElementById('sk-desc').value || '').trim();
+          const tags = (document.getElementById('sk-tags').value || '').split(',').map(t => t.trim()).filter(Boolean);
+          const body = (document.getElementById('sk-body').value || '').trim();
+          if (!name || !body) { if (window.toast) window.toast('名称和 body 必填', 'error'); return; }
+          try {
+            await window.__api.api.post('/api/skills', { slug, name, description: desc, tags, body });
+            if (window.toast) window.toast('Skill 已保存', 'success');
+            if (typeof window.closeModal === 'function') window.closeModal();
+            const hash = location.hash;
+            location.hash = '';
+            setTimeout(() => { location.hash = hash; }, 50);
+          } catch (e) {
+            if (window.toast) window.toast('保存失败:' + e.message, 'error');
+          }
+        });
+        if (skill) {
+          const del = document.getElementById('sk-delete');
+          if (del) del.addEventListener('click', async () => {
+            if (!confirm('确认删除这个 skill?')) return;
+            try {
+              const r = await fetch('/api/skills/' + encodeURIComponent(skill.slug), { method: 'DELETE' });
+              if (window.toast) window.toast('已删除', 'success');
+              if (typeof window.closeModal === 'function') window.closeModal();
+              const hash = location.hash;
+              location.hash = '';
+              setTimeout(() => { location.hash = hash; }, 50);
+            } catch (e) {
+              if (window.toast) window.toast('删除失败:' + e.message, 'error');
+            }
+          });
+        }
+      }, 60);
+    }
+    if (existingSlug) {
+      window.__api.api.get('/api/skills/' + encodeURIComponent(existingSlug)).then(s => {
+        if (s) populateSkillModal(s);
+      });
+    } else {
+      populateSkillModal(null);
+    }
+  }
+
   // -------------------- Knowledge graph helpers (v0.4.c6.知识图谱) --------------------
   // Build a graph from wikilinks + shared tags. Two entities are connected if:
   //   - One has a wikilink to the other ([[type/slug]] or [[slug]])
@@ -2594,6 +2741,11 @@
       if (route === 'decisions') {
         content.innerHTML = renderDecisions(state);
         bindDecisionActions(content, state);
+        return;
+      }
+      if (route === 'skills') {
+        content.innerHTML = await renderSkills(state);
+        bindSkillsActions(content);
         return;
       }
       const map = [].concat(NAV_PRIMARY, NAV_RESOURCES).reduce((m, it) => (m[it.impl] = it.label, m), {});
