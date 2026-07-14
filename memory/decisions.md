@@ -490,3 +490,8 @@
 
 - **MCP server (ADR-0006)** — JSON-RPC 2.0 over stdio. 4 tools: list_entities, get_entity, search_entities, create_entity. Reuses the Vault class. Privacy: local-only.
 - **203 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.7 reflection patterns landed)
+
+- **Weekly reflection now includes 模式与趋势 (vs 上周) + 节奏** — detectTrends() compares this week's summary to last week's frontmatter (eventsCount). Surfaces activity volume change, new event types, disappeared types, plus daily average.
+- **204 commits on main** — pushed to origin.
