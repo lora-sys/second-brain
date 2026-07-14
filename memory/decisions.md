@@ -474,3 +474,9 @@
 
 - **Notes list capped at 50** — each type-grouped section in 笔记库 shows top 50 most-recent items, with a "显示全部" link if there are more. Prevents DOM explosion on large vaults.
 - **196 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.4-6a skeleton landed)
+
+- **Type-aware skeleton states** replace the generic spinner in both standard and cockpit modes. 4+7 route-specific shapes (tags chips, notes rows, agent hero+grid, daily/weekly blocks, decisions/skills blocks).
+- **Pure CSS** shimmer + pulse animations. No new deps.
+- **200 commits on main** — pushed to origin.
