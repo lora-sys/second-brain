@@ -3299,6 +3299,49 @@ body.cockpit-mode .app { display: none !important; }
 #agent-send { white-space: nowrap; }
 
 /* ============================================================================
+ * v0.5.4 — Daily Timeline
+ * Grid of 7 days showing which days have generated journals.
+ * ========================================================================== */
+.cockpit-daily-timeline h2 {
+  margin: 0 0 12px; font-size: 14px; font-weight: 600;
+  color: var(--text-soft); text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cockpit-daily-timeline-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;
+}
+.cockpit-daily-timeline-day {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 8px; background: var(--surface-2);
+  border-radius: 8px; border: 1px solid var(--border-soft);
+  cursor: pointer; transition: all 0.15s;
+  min-height: 80px;
+}
+.cockpit-daily-timeline-day:hover { background: var(--surface-3); border-color: var(--accent-soft-border, rgba(124,58,237,0.3)); }
+.cockpit-daily-timeline-day.has-journal {
+  background: var(--surface-1);
+  border-left: 3px solid var(--accent-strong, #7c3aed);
+}
+.cockpit-daily-timeline-label {
+  font-size: 11px; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.cockpit-daily-timeline-date {
+  font-size: 13px; font-weight: 600;
+  font-family: var(--font-mono);
+}
+.cockpit-daily-timeline-badge {
+  font-size: 10px; padding: 2px 6px; border-radius: 8px;
+  background: var(--accent-soft, rgba(124,58,237,0.1));
+  color: var(--accent-strong, #7c3aed);
+  align-self: flex-start; font-weight: 600;
+}
+.cockpit-daily-timeline-badge.empty {
+  background: var(--surface-3); color: var(--text-faint);
+}
+
+/* ============================================================================
  * v0.5 — Cockpit Daily Journal Section
  * Generates daily markdown from event stream. Local-echo by default,
  * OpenAI/Ollama when configured.
