@@ -423,3 +423,12 @@
 - **72 E2E + 49 Rust unit = 121 tests passing**.
 - **Phase 4 of roadmap (Decision Journal) done**. Next: v0.9+ (Personal Agent + Skill distillation).
 - **172 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.9 — Skills landed)
+
+- **Skills system shipped** — Personal Agent now has reusable instruction sets stored as markdown files in `00-AI/skills/`.
+- **Three interaction points**: chip bar (read), inline button "↻ 存为 skill" (save from response), quick prompt "保存当前对话为 skill".
+- **Auto-load into prompt** — not yet wired. Filed v0.9.x.
+- **76 E2E + 49 Rust unit = 125 tests passing**.
+- **Phase 5 of roadmap (Personal Agent + Skill distillation) starting**. v0.9.x will add the loader, then v0.9.0 release.
+- **176 commits on main** — pushed to origin.
