@@ -3113,3 +3113,187 @@ body.cockpit-mode .app { display: none !important; }
 .cockpit-templates-empty svg { color: var(--text-faint); margin-bottom: 12px; }
 .cockpit-templates-empty h2 { margin: 0 0 6px; font-size: 16px; }
 .cockpit-templates-empty p { margin: 0; font-size: 13px; color: var(--text-soft); }
+
+/* ============================================================================
+ * v0.4.c6.智能体 — Cockpit Agent Section
+ * Local-echo agent preview. Status cards + composer + conversation log.
+ * Real LLM integration lands in v0.5.
+ * ========================================================================== */
+
+.cockpit-agent { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+.cockpit-agent-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 22px;
+  background: var(--surface-1);
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+}
+.cockpit-agent-hero svg { color: var(--accent-strong); flex-shrink: 0; margin-top: 2px; }
+.cockpit-agent-hero h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+.cockpit-agent-hero p { margin: 0; color: var(--text-soft); font-size: 13px; }
+
+.cockpit-agent-status {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.cockpit-agent-status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--surface-1);
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+}
+.cockpit-agent-status-label {
+  font-size: 11px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cockpit-agent-status-value {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.cockpit-agent-status-online { color: #059669; }
+
+.cockpit-agent-conversation {
+  min-height: 240px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--surface-1);
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cockpit-agent-empty {
+  margin: auto;
+  text-align: center;
+  color: var(--text-soft);
+}
+.cockpit-agent-empty svg { color: var(--text-faint); margin-bottom: 8px; }
+.cockpit-agent-empty h2 { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--text); }
+.cockpit-agent-empty p { margin: 0; font-size: 12px; }
+
+.cockpit-agent-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cockpit-agent-msg-label {
+  font-size: 10px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.cockpit-agent-msg-body {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cockpit-agent-msg-user .cockpit-agent-msg-body {
+  background: var(--accent-soft, rgba(124, 58, 237, 0.08));
+  border: 1px solid var(--accent-soft-border, rgba(124, 58, 237, 0.2));
+  align-self: flex-end;
+  max-width: 80%;
+}
+.cockpit-agent-msg-assistant .cockpit-agent-msg-body {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  align-self: flex-start;
+  max-width: 90%;
+}
+.cockpit-agent-thinking {
+  display: inline-block;
+  font-style: italic;
+  color: var(--text-soft);
+}
+.cockpit-agent-thinking::after {
+  content: '...';
+  animation: cockpit-agent-dots 1.2s steps(4) infinite;
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  width: 0;
+}
+@keyframes cockpit-agent-dots {
+  to { width: 1.2em; }
+}
+.cockpit-agent-response-text {
+  margin: 0;
+  font-family: inherit;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cockpit-agent-response-meta {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 10px;
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+}
+
+.cockpit-agent-composer {
+  padding: 14px 16px;
+  background: var(--surface-1);
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#agent-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+  min-height: 50px;
+  box-sizing: border-box;
+}
+#agent-input:focus { outline: 2px solid var(--accent-soft-border); outline-offset: -1px; }
+
+.cockpit-agent-composer-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cockpit-agent-quick-prompts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.cockpit-agent-quick-btn {
+  padding: 5px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cockpit-agent-quick-btn:hover { background: var(--surface-3); }
+#agent-send { white-space: nowrap; }
