@@ -339,3 +339,14 @@
 - **46/46 E2E pass** — 1 new test for create_task action execution.
 - **Pattern**: this is the bridge from read-only agent to read-write agent. Real LLM (when wired) can emit actions via system prompt → same executeActions handler.
 - **138 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.6 backlinks shipped)
+
+- **Backlinks panel shipped** — every entity detail page now shows a 引用 (References) panel with two columns:
+  - 引用了 (forward refs): entities this one mentions
+  - 被引用 (back refs): entities that mention this one
+- **Resolution is fuzzy** — matches against id, type/slug, slug, or title. Handles all the ways users write wikilinks in Obsidian ([[Alice Chen]] vs [[alice]] vs [[person/alice]]).
+- **30s cached bodies** — `_fullEntitiesCache` caches `/api/entities` results with bodies for 30s to avoid re-fetching on every navigation.
+- **52/52 E2E pass** — 3 new tests for the backlinks panel.
+- **Pattern**: this is the v0.6 piece the roadmap called for ("Backlinks panel on every detail page"). Phase 3 (Knowledge Graph + Semantic Search) is now 25% done.
+- **144 commits on main** — pushed to origin.
