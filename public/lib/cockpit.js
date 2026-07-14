@@ -244,6 +244,48 @@
     });
     return all.slice(0, 6);
   }
+  // v0.12 — Latest reflection widget (loads latest weekly journal excerpt)
+  async function renderLatestReflection() {
+let journals = [];
+    try {
+      const r = await window.__api.api.get('/api/weekly');
+      journals = (r && r.weeklies) || [];
+    } catch (e) {}
+    if (journals.length === 0) {
+      return [
+        '<article class="cockpit-today-block block-insight">',
+          '<header class="cockpit-block-header">',
+            '<span class="cockpit-block-icon">' + icon('book', 14) + '</span>',
+            '<h2 class="cockpit-block-title">最新周报</h2>',
+          '</header>',
+          '<div class="cockpit-block-body">',
+            '<p class="cockpit-block-empty">还没有周报。生成第一篇就能在这里看到摘要。</p>',
+            '<a class="btn btn-ghost btn-sm" href="#/weekly" style="margin-top:10px; display:inline-block;">去生成 →</a>',
+          '</div>',
+        '</article>'
+      ].join('');
+    }
+    const latest = journals[0];
+    let body = (latest.body || '').replace(/^#\s*[^\n]*\n/, '');  // Strip leading # heading only
+    const lines = body.split('\n').filter(function (l) { return l.trim().length > 0; });
+    const summary = lines.slice(0, 5).join('\n').slice(0, 400);
+    return [
+      '<article class="cockpit-today-block block-insight">',
+        '<header class="cockpit-block-header">',
+          '<span class="cockpit-block-icon">' + icon('book', 14) + '</span>',
+          '<h2 class="cockpit-block-title">最新周报</h2>',
+          '<span class="cockpit-block-count">' + esc(latest.date) + '</span>',
+        '</header>',
+        '<div class="cockpit-block-body">',
+          '<pre class="cockpit-insight-preview">' + esc(summary) + '</pre>',
+          '<a class="btn btn-ghost btn-sm" href="#/weekly" style="margin-top:10px; display:inline-block;">看完整周报 →</a>',
+        '</div>',
+      '</article>'
+    ].join('');
+  }
+
+
+  // v0.10 — Recent activity widget (loads from /api/events)
   // v0.10 — Recent activity widget (loads from /api/events)
   async function renderRecentActivity() {
     let events = [];
@@ -890,6 +932,7 @@
     const dateStr = today.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
     const emoji = ['📓','🌱','✨','🔮','🪴'][today.getDate() % 5];
     const activityHtml = await renderRecentActivity();
+    const insightHtml = await renderLatestReflection();
     const reflectionHtml = reflection
       ? `<div class="cockpit-reflection">
            <div class="cockpit-reflection-kind">${esc(reflection._type || '')}</div>
@@ -944,6 +987,7 @@
         '</div>',
         renderBottomRow(state),
         activityHtml,
+        insightHtml,
       '</div>'
     ].join('');
   }
