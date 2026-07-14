@@ -244,6 +244,87 @@
     });
     return all.slice(0, 6);
   }
+  // v0.10 — Recent activity widget (loads from /api/events)
+  async function renderRecentActivity() {
+    let events = [];
+    try {
+      const r = await window.__api.api.get('/api/events?days=7');
+      events = (r && r.events) || [];
+    } catch (e) { /* ignore */ }
+    if (events.length === 0) {
+      return [
+        '<article class="cockpit-today-block block-activity">',
+          '<header class="cockpit-block-header">',
+            '<span class="cockpit-block-icon">' + icon('activity', 14) + '</span>',
+            '<h2 class="cockpit-block-title">近期活动</h2>',
+            '<span class="cockpit-block-count">0</span>',
+          '</header>',
+          '<div class="cockpit-block-body">',
+            '<p class="cockpit-block-empty">过去 7 天没有事件流。开始用 vault 之后会显示在这里。</p>',
+          '</div>',
+        '</article>'
+      ].join('');
+    }
+    // Take latest 8
+    const recent = events.slice(-8).reverse();
+    const typeLabels = {
+      'task.created': '任务 开了',
+      'task.done': '任务 完成',
+      'task.updated': '任务 更新',
+      'task.deleted': '任务 删除',
+      'project.created': '项目 开了',
+      'person.created': '人物 添加',
+      'link.imported': '链接 导入',
+      'file.changed': '文件 修改',
+      'daily.generated': '日记 生成',
+      'weekly.generated': '周报 生成',
+      'decision.created': '决策 记录',
+      'decision.updated': '决策 回顾',
+    };
+    const typeDots = {
+      'task.created': 'dot-task',
+      'task.done': 'dot-task',
+      'task.updated': 'dot-task',
+      'task.deleted': 'dot-task',
+      'project.created': 'dot-project',
+      'project.done': 'dot-project',
+      'person.created': 'dot-person',
+      'link.imported': 'dot-link',
+      'file.changed': 'dot-link',
+      'daily.generated': 'dot-project',
+      'weekly.generated': 'dot-project',
+      'decision.created': 'dot-decision',
+      'decision.updated': 'dot-decision',
+    };
+    const itemsHtml = recent.map(e => {
+      const type = e.type || '';
+      const label = typeLabels[type] || type;
+      const dotCls = typeDots[type] || 'dot-task';
+      // Get related entity title if possible
+      const id = e.id || '';
+      const title = e.title || '';
+      const content = title ? `<a href="#/entity/${esc(encodeURIComponent(id))}">${esc(title)}</a>` : '';
+      const ts = e.ts ? new Date(e.ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
+      return '<li>' +
+        '<span class="cockpit-list-dot ' + dotCls + '"></span>' +
+        '<span class="cockpit-list-title">' + esc(label) + ' ' + content + '</span>' +
+        '<span class="cockpit-list-meta">' + esc(ts) + '</span>' +
+      '</li>';
+    }).join('');
+    return [
+      '<article class="cockpit-today-block block-activity">',
+        '<header class="cockpit-block-header">',
+          '<span class="cockpit-block-icon">' + icon('activity', 14) + '</span>',
+          '<h2 class="cockpit-block-title">近期活动</h2>',
+          '<span class="cockpit-block-count">' + events.length + '</span>',
+        '</header>',
+        '<div class="cockpit-block-body">',
+          '<ul class="cockpit-list">' + itemsHtml + '</ul>',
+        '</div>',
+      '</article>'
+    ].join('');
+  }
+
   function renderBottomRow(state) {
     const cap = captures(state);
     const bk = bookmarks(state);
@@ -800,7 +881,7 @@
     if (reloadBtn) reloadBtn.addEventListener('click', reload);
   }
 
-    function renderTodayPanel() {
+    async function renderTodayPanel() {
     const state = (window.__appState) || { entities: { person: [], task: [], project: [], link: [] } };
     const reflection = pickReflection(state);
     const wins = todayWins(state);
@@ -808,6 +889,7 @@
     const today = new Date();
     const dateStr = today.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
     const emoji = ['📓','🌱','✨','🔮','🪴'][today.getDate() % 5];
+    const activityHtml = await renderRecentActivity();
     const reflectionHtml = reflection
       ? `<div class="cockpit-reflection">
            <div class="cockpit-reflection-kind">${esc(reflection._type || '')}</div>
@@ -861,6 +943,7 @@
           renderRightRail(state),
         '</div>',
         renderBottomRow(state),
+        activityHtml,
       '</div>'
     ].join('');
   }
@@ -2744,7 +2827,7 @@
     renderCockpitSkeleton(content, route);
     try {
       if (route === 'dashboard' || route === '' || !route) {
-        content.innerHTML = renderTodayPanel();
+        content.innerHTML = await renderTodayPanel();
         return;
       }
       if (route === 'tasks') { if (window.__renderTasks) await window.__renderTasks(); return; }
