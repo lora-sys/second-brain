@@ -3482,3 +3482,58 @@ body.cockpit-mode .app { display: none !important; }
   color: var(--text);
   flex: 1;
 }
+
+/* ============================================================================
+ * v0.6 — Entity Relations (backlinks panel)
+ * Forward + back references shown on every entity detail page.
+ * ========================================================================== */
+
+.entity-relations-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  margin-top: 8px;
+}
+.entity-relations-col {
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.entity-relations-col-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.entity-relations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.entity-relations-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 13px;
+  transition: background 0.15s;
+}
+.entity-relations-item:hover { background: var(--surface-3); }
+.entity-relations-title { font-weight: 500; }
+.entity-relations-meta {
+  font-size: 10px;
+  color: var(--text-soft);
+  padding: 2px 6px;
+  background: var(--surface-1);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
