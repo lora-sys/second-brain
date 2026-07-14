@@ -417,11 +417,12 @@
     }
     const typeLabels = { person: '人物', task: '任务', project: '项目', link: '链接' };
     const sectionHtml = groups.filter(g => g.count > 0).map(g => {
-      const items = (e[g.type] || []).slice().sort((a, b) => {
+      const allItems = (e[g.type] || []).slice().sort((a, b) => {
         const ua = (a.data && a.data.updated) || '';
         const ub = (b.data && b.data.updated) || '';
         return ub.localeCompare(ua);
       });
+      const { shown: items, total: typeTotal, more: moreCount } = virtualizeItems(allItems, 50);
       const itemsHtml = items.map(item => {
         const title = item.title || item.slug;
         const type = item.type;
@@ -444,7 +445,8 @@
             '<h2 class="cockpit-notes-title">' + esc(g.label) + '</h2>',
             '<span class="cockpit-notes-count">' + g.count + '</span>',
           '</header>',
-          '<div class="cockpit-notes-list">' + itemsHtml + '</div>',
+          '<div class="cockpit-notes-list">' + itemsHtml + '</div>' +
+          (moreCount > 0 ? '<div class="cockpit-notes-more">还有 ' + moreCount + ' 个未显示 (共 ' + typeTotal + ' 个 ' + esc(g.label) + ')。<a href="#" data-show-all="' + esc(g.type) + '">显示全部</a></div>' : '') +
         '</section>'
       ].join('');
     }).join('');
@@ -1012,6 +1014,15 @@
   // status) and gives users a feel for what it does. The actual LLM
   // integration lands in v0.5 (per the roadmap). For now, the agent answers
   // with deterministic, keyword-matched responses derived from the vault state.
+  // Virtualize: cap an array at `limit` items, return { shown, total, more }
+  // Used by long-list sections (notes/resources) to keep DOM small.
+  function virtualizeItems(items, limit) {
+    if (!items || items.length <= limit) {
+      return { shown: items || [], total: (items || []).length, more: 0 };
+    }
+    return { shown: items.slice(0, limit), total: items.length, more: items.length - limit };
+  }
+
   const AGENT_QUICK_PROMPTS = [
     { id: 'summary',   label: '总结最近的活动', prompt: '总结我最近一周的活动' },
     { id: 'tasks',     label: '我有哪些未完成任务?', prompt: '我有哪些 open 状态的任务?' },
@@ -1454,6 +1465,38 @@
       type: 'skill',
       body: body,
       footer: '<button class="btn" data-close>关闭</button>'
+    });
+  }
+
+  // Bind "show all" buttons in the notes section (v0.4-6b virtualization)
+  function bindNotesShowAll(content) {
+    content.querySelectorAll('[data-show-all]').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const type = a.getAttribute('data-show-all');
+        const section = a.closest('.cockpit-notes-section');
+        if (!section) return;
+        const allItems = (window.__state && window.__state.state && window.__state.state.entities && window.__state.state.entities[type]) || [];
+        allItems.sort((a, b) => ((b.data && b.data.updated) || '').localeCompare((a.data && a.data.updated) || ''));
+        const list = section.querySelector('.cockpit-notes-list');
+        if (!list) return;
+        const itemsHtml = allItems.map(item => {
+          const title = item.title || item.slug;
+          const tags = (item.data && item.data.tags) || [];
+          const tagHtml = tags.length
+            ? '<span class="cockpit-notes-tags">' + tags.slice(0, 3).map(t => '<span class="cockpit-tag">' + esc(t) + '</span>').join('') + '</span>'
+            : '';
+          return '<a class="cockpit-notes-item" href="#/entity/' + esc(item.id) + '">' +
+            '<span class="cockpit-list-dot dot-' + esc(item.type) + '"></span>' +
+            '<span class="cockpit-notes-title">' + esc(title) + '</span>' +
+            tagHtml +
+            '<span class="cockpit-list-meta">' + esc(((item.data && item.data.updated) || '').slice(0, 10)) + '</span>' +
+          '</a>';
+        }).join('');
+        list.innerHTML = itemsHtml;
+        const moreRow = section.querySelector('.cockpit-notes-more');
+        if (moreRow) moreRow.remove();
+      });
     });
   }
 
@@ -2697,6 +2740,7 @@
       }
       if (route === 'notes') {
         content.innerHTML = renderNotes(state);
+        bindNotesShowAll(content);
         return;
       }
       if (route === 'tags') {

@@ -3866,3 +3866,23 @@ body.cockpit-mode .app { display: none !important; }
   border-radius: 8px; border: 1px solid var(--border-soft);
   text-align: center; color: var(--text-soft);
 }
+
+/* ============================================================================
+ * v0.4-6b — Virtualize long lists
+ * Notes/resources sections cap at 50 items, with "show all" link.
+ * ========================================================================== */
+.cockpit-notes-more {
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border-soft);
+  font-size: 12px;
+  color: var(--text-soft);
+  text-align: center;
+}
+.cockpit-notes-more a {
+  color: var(--accent-strong, #7c3aed);
+  text-decoration: none;
+  margin-left: 6px;
+  font-weight: 600;
+}
+.cockpit-notes-more a:hover { text-decoration: underline; }
