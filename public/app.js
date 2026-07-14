@@ -1163,6 +1163,20 @@
   }
 
   // ============================ Entity modal =========================
+
+  // Cache of full entities (with body) for backlinks computation
+  const _fullEntitiesCache = { data: null, ts: 0 };
+  async function preloadAllEntitiesWithBodies() {
+    if (Date.now() - _fullEntitiesCache.ts < 30000 && _fullEntitiesCache.data) return _fullEntitiesCache.data;
+    try {
+      const items = await api.req('/api/entities');
+      const arr = (items && items.items) || [];
+      _fullEntitiesCache.data = arr;
+      _fullEntitiesCache.ts = Date.now();
+      return arr;
+    } catch (e) { return []; }
+  }
+
   async function preloadAllEntities() {
     if (state.allEntities.length > 0) return;
     try {
@@ -1411,6 +1425,8 @@
   // ============================ Entity detail page ====================
   async function renderEntity(id) {
     await preloadAllEntities();
+    // Preload full entities (with bodies) for backlinks computation
+    await preloadAllEntitiesWithBodies();
     let entity;
     try { entity = await api.read(id); } catch (err) {
       $('#page-title').textContent = '未找到';
@@ -1509,14 +1525,88 @@
     return `<div class="embed">${linkCardHtml({ title: d.title, url: d.url, description: d.description, cover: d.cover, site: d.site })}</div>`;
   }
 
+  // Forward refs: this entity's body mentions [[other]]
+  // Back refs: other entities' bodies mention [[this]]
+  // Uses _fullEntitiesCache (entries have body) for back-ref scan.
+  function computeEntityRelations(entity) {
+    const myId = entity.id; // e.g. '10-People/alice'
+    const mySlug = entity.slug;
+    const myTitle = (entity.data && (entity.data.title || entity.data.name)) || '';
+    const fullEntities = _fullEntitiesCache.data || [];
+    if (fullEntities.length === 0) return { forward: [], back: [] };
+    // Forward: extract wikilink targets from this entity's body
+    const body = entity.body || '';
+    const forwardTargets = new Set();
+    const re = /\[\[([^\]|]+?)(?:\|([^\]]+))?\]\]/g;
+    let m;
+    while ((m = re.exec(body)) !== null) {
+      forwardTargets.add(m[1].trim());
+    }
+    // Resolve forward targets: match against id, type/slug, slug, or title
+    const forward = [];
+    for (const target of forwardTargets) {
+      const resolved = fullEntities.find(e => {
+        if (e.id === target) return true;
+        if (`${e.type}/${e.slug}` === target) return true;
+        if (e.slug === target) return true;
+        const t = (e.data && (e.data.title || e.data.name)) || '';
+        return t === target;
+      });
+      if (resolved) {
+        forward.push({ entity: resolved, target });
+      }
+    }
+    // Back: scan full entities for [[myId]] / [[mySlug]] / [[myTitle]]
+    const back = [];
+    for (const other of fullEntities) {
+      if (other.id === myId) continue;
+      if (!other.body) continue;
+      const matches = [...other.body.matchAll(/\[\[([^\]|]+?)(?:\|([^\]]+))?\]\]/g)];
+      for (const mm of matches) {
+        const t = mm[1].trim();
+        if (t === myId || t === mySlug || t === myTitle) {
+          back.push({ entity: other, context: mm[0] });
+          break;
+        }
+      }
+    }
+    return { forward, back };
+  }
+
   function renderEntityRelations(entity) {
-    if (!entity.body) return '';
-    const refs = [...entity.body.matchAll(/\[\[([^\]|]+?)(?:\|([^\]]+))?\]\]/g)].map((m) => m[1]);
-    if (!refs.length) return '';
-    return `<div class="dash-section" style="margin-top: var(--sp-7);">
-      <div class="dash-section-header"><h3 class="dash-section-title">交叉引用</h3></div>
-      <div class="muted">${refs.length} 处引用，渲染时已尝试解析。点击 wikilink 跳转。</div>
-    </div>`;
+    const { forward, back } = computeEntityRelations(entity);
+    if (forward.length === 0 && back.length === 0) return '';
+    const fwdHtml = forward.length === 0 ? '<div class="muted">无引用</div>'
+      : '<div class="entity-relations-list">' + forward.map(({ entity: e }) => {
+          const title = (e.data && (e.data.title || e.data.name)) || e.slug;
+          const eid2 = e.id || (e.type + '/' + e.slug); return '<a class="entity-relations-item" href="#/entity/' + encodeURIComponent(eid2) + '">' +
+            '<span class="cockpit-list-dot dot-' + escapeHtml(e.type) + '"></span>' +
+            '<span class="entity-relations-title">' + escapeHtml(title) + '</span>' +
+            '<span class="entity-relations-meta">' + escapeHtml(e.type) + '</span>' +
+          '</a>';
+        }).join('') + '</div>';
+    const backHtml = back.length === 0 ? '<div class="muted">无反向引用</div>'
+      : '<div class="entity-relations-list">' + back.map(({ entity: e }) => {
+          const title = (e.data && (e.data.title || e.data.name)) || e.slug;
+          const eid2 = e.id || (e.type + '/' + e.slug); return '<a class="entity-relations-item" href="#/entity/' + encodeURIComponent(eid2) + '">' +
+            '<span class="cockpit-list-dot dot-' + escapeHtml(e.type) + '"></span>' +
+            '<span class="entity-relations-title">' + escapeHtml(title) + '</span>' +
+            '<span class="entity-relations-meta">' + escapeHtml(e.type) + '</span>' +
+          '</a>';
+        }).join('') + '</div>';
+    return '<div class="dash-section" style="margin-top: var(--sp-7);">' +
+      '<div class="dash-section-header"><h3 class="dash-section-title">引用</h3></div>' +
+      '<div class="entity-relations-grid">' +
+        '<div class="entity-relations-col">' +
+          '<h4 class="entity-relations-col-title">引用了 (' + forward.length + ')</h4>' +
+          fwdHtml +
+        '</div>' +
+        '<div class="entity-relations-col">' +
+          '<h4 class="entity-relations-col-title">被引用 (' + back.length + ')</h4>' +
+          backHtml +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }
 
   // ============================ Wikilinks ============================

@@ -243,6 +243,30 @@ async (page) => {
     const has = await page.evaluate(() => !!document.querySelector('.cockpit-daily-timeline-day.has-journal'));
     if (!has) throw new Error('no has-journal cell');
   });
+  // ---- v0.6 backlinks ----
+  await page.goto(BASE + '/?v=' + Date.now() + '#/entity/30-Projects/AI%20Engineering%20Harness');
+  await page.waitForSelector('.entity-relations-grid', { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(1500);
+  await t('backlinks: project page has relations grid', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.entity-relations-grid'));
+    if (!has) throw new Error('no relations grid on project page');
+  });
+  await t('backlinks: project has forward refs', async () => {
+    const n = await page.evaluate(() => {
+      const cols = document.querySelectorAll('.entity-relations-col');
+      const fwd = cols[0] ? cols[0].querySelectorAll('.entity-relations-item').length : 0;
+      return fwd;
+    });
+    if (n === 0) throw new Error('no forward refs (expected 5)');
+  });
+  await t('backlinks: project has back refs', async () => {
+    const n = await page.evaluate(() => {
+      const cols = document.querySelectorAll('.entity-relations-col');
+      const back = cols[1] ? cols[1].querySelectorAll('.entity-relations-item').length : 0;
+      return back;
+    });
+    if (n === 0) throw new Error('no back refs (expected 4)');
+  });
   await t('cockpit: NO soon badges remain anywhere in sidebar', async () => {
     const soonItems = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-nav-item.is-soon')).map(el => el.textContent.trim()));
     if (soonItems.length > 0) throw new Error('still has soon badges: ' + soonItems.join(', '));
@@ -319,6 +343,30 @@ async (page) => {
   await t('daily: timeline day with journal has-journal class', async () => {
     const has = await page.evaluate(() => !!document.querySelector('.cockpit-daily-timeline-day.has-journal'));
     if (!has) throw new Error('no has-journal cell');
+  });
+  // ---- v0.6 backlinks ----
+  await page.goto(BASE + '/?v=' + Date.now() + '#/entity/30-Projects/AI%20Engineering%20Harness');
+  await page.waitForSelector('.entity-relations-grid', { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(1500);
+  await t('backlinks: project page has relations grid', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.entity-relations-grid'));
+    if (!has) throw new Error('no relations grid on project page');
+  });
+  await t('backlinks: project has forward refs', async () => {
+    const n = await page.evaluate(() => {
+      const cols = document.querySelectorAll('.entity-relations-col');
+      const fwd = cols[0] ? cols[0].querySelectorAll('.entity-relations-item').length : 0;
+      return fwd;
+    });
+    if (n === 0) throw new Error('no forward refs (expected 5)');
+  });
+  await t('backlinks: project has back refs', async () => {
+    const n = await page.evaluate(() => {
+      const cols = document.querySelectorAll('.entity-relations-col');
+      const back = cols[1] ? cols[1].querySelectorAll('.entity-relations-item').length : 0;
+      return back;
+    });
+    if (n === 0) throw new Error('no back refs (expected 4)');
   });
   await t('cockpit: NO soon badges remain anywhere in sidebar', async () => {
     const soonItems = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-nav-item.is-soon')).map(el => el.textContent.trim()));
