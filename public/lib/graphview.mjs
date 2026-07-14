@@ -21,6 +21,11 @@ export class GraphView {
     this.dragOffset = { x: 0, y: 0 };
     this.raf = null;
     this.onNodeClick = null; // callback (entity) => void
+    this.scale = 1;
+    this.panX = 0;
+    this.panY = 0;
+    this.panning = false;
+    this.panStart = { x: 0, y: 0, panX: 0, panY: 0 };
     this._setup();
   }
 
@@ -43,6 +48,7 @@ export class GraphView {
     this.force = new GraphForce(nodes, edges, this.width, this.height);
     this.force.initialLayout(300);
     // Mouse events
+    this.canvas.addEventListener('wheel', (e) => this._onWheel(e), { passive: false });
     this.canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
     this.canvas.addEventListener('mousedown', (e) => this._onMouseDown(e));
     this.canvas.addEventListener('mouseup', (e) => this._onMouseUp(e));
@@ -70,6 +76,19 @@ export class GraphView {
     this._render();
   }
 
+  _onWheel(e) {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const newScale = Math.max(0.2, Math.min(3, this.scale * factor));
+    this.panX = x - (x - this.panX) * (newScale / this.scale);
+    this.panY = y - (y - this.panY) * (newScale / this.scale);
+    this.scale = newScale;
+    this._render();
+  }
+
   _start() {
     if (this.raf) return;
     const tick = () => {
@@ -89,10 +108,23 @@ export class GraphView {
 
   _getMousePos(e) {
     const rect = this.canvas.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    return {
+      x: (x - this.panX) / this.scale,
+      y: (y - this.panY) / this.scale,
+    };
   }
 
   _onMouseMove(e) {
+    if (this.panning) {
+      const dx = e.clientX - this.panStart.x;
+      const dy = e.clientY - this.panStart.y;
+      this.panX = this.panStart.panX + dx;
+      this.panY = this.panStart.panY + dy;
+      this._render();
+      return;
+    }
     const { x, y } = this._getMousePos(e);
     if (this.dragging) {
       this.force.moveDrag(this.dragging, x - this.dragOffset.x, y - this.dragOffset.y);
@@ -114,6 +146,9 @@ export class GraphView {
       this.dragging = node.id;
       this.dragOffset = { x: x - node.x, y: y - node.y };
       this.force.startDrag(node.id);
+    } else {
+      this.panning = true;
+      this.panStart = { x: e.clientX, y: e.clientY, panX: this.panX, panY: this.panY };
     }
   }
 
@@ -121,6 +156,9 @@ export class GraphView {
     if (this.dragging) {
       this.force.endDrag();
       this.dragging = null;
+    }
+    if (this.panning) {
+      this.panning = false;
     }
   }
 
@@ -137,11 +175,12 @@ export class GraphView {
     const w = this.width, h = this.height;
     if (!w || !h) return;
     // Clear
-    ctx.fillStyle = 'var(--surface-1)';
-    ctx.fillRect(0, 0, w, h);
-    // Background
     ctx.fillStyle = '#fbfaf6';
     ctx.fillRect(0, 0, w, h);
+    // Apply zoom/pan transform
+    ctx.save();
+    ctx.translate(this.panX, this.panY);
+    ctx.scale(this.scale, this.scale);
     // Edges
     ctx.lineWidth = 1;
     for (const e of this.force.edges) {
@@ -156,6 +195,15 @@ export class GraphView {
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
+      if (isHovered) {
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        ctx.fillStyle = '#7c3aed';
+        ctx.font = 'bold 9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('●', mx, my);
+      }
     }
     // Nodes
     for (const n of this.force.nodes) {
@@ -183,6 +231,7 @@ export class GraphView {
         ctx.fillText(label, n.x, n.y + r + 4);
       }
     }
+    ctx.restore();
     // Legend
     ctx.font = '11px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'left';
