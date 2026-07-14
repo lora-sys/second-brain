@@ -99,6 +99,7 @@ _None._
 
 | PR | Title | Evidence |
 |---|---|---|
+| `a250637` | merge: feature/v0.5-event-stream (event stream + daily journal) | [docs/evidence/v0.5-event-stream/](evidence/v0.5-event-stream/) |
 | `d340e5f` | merge: feature/v0.4.c6-agent (智能体 — last cockpit placeholder) | [docs/evidence/v0.4.c6-agent/](evidence/v0.4.c6-agent/) |
 | `3d6d660` | merge: feature/v0.4.c6-templates (templates section) | [docs/evidence/v0.4.c6-templates/](evidence/v0.4.c6-templates/) |
 | `259e396` | merge: feature/v0.4.c6-knowledge-graph (knowledge graph view) | [docs/evidence/v0.4.c6-knowledge/](evidence/v0.4.c6-knowledge/) |
