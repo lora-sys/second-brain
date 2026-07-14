@@ -336,6 +336,53 @@ async (page) => {
     const hasBtn = await page.evaluate(() => !!document.getElementById('skill-new-btn'));
     if (!hasBtn) throw new Error('no new-skill button');
   });
+  // ---- v0.14: Insight widget E2E tests ----
+  await t('insight: dashboard insight widget renders latest weekly as markdown', async () => {
+    // Ensure there's a weekly in 00-Weekly/ - it's already there from earlier
+    await page.goto(BASE + '/?cockpit=1&v=' + Date.now() + '#/dashboard');
+    await page.waitForTimeout(2500);
+    const has = await page.evaluate(() => {
+      const el = document.querySelector('.block-insight, .cockpit-insight-rendered, .cockpit-insight-preview');
+      if (!el) return false;
+      // If rendered as markdown, expect a <p> or <h1>/<h2> child
+      if (el.classList.contains('cockpit-insight-rendered')) {
+        return el.querySelector('p, h1, h2, h3, ul, ol') !== null;
+      }
+      // If plain text preview, just check it has text
+      return el.textContent.trim().length > 0;
+    });
+    if (!has) throw new Error('insight widget did not render content');
+  });
+
+  await t('insight: insight block has a link to /weekly', async () => {
+    await page.goto(BASE + '/?cockpit=1&v=' + Date.now() + '#/dashboard');
+    await page.waitForTimeout(2500);
+    const hasLink = await page.evaluate(() => {
+      const block = document.querySelector('.block-insight');
+      if (!block) return false;
+      const a = block.querySelector('a[href*="weekly"]');
+      return !!a;
+    });
+    if (!hasLink) throw new Error('insight block has no /weekly link');
+  });
+
+  await t('insight: insight date matches latest weekly file', async () => {
+    const apiDate = await page.evaluate(async () => {
+      const x = await fetch('/api/weekly');
+      const d = await x.json();
+      return d.weeklies && d.weeklies[0] ? d.weeklies[0].date : null;
+    });
+    if (!apiDate) throw new Error('no weekly available');
+
+    await page.goto(BASE + '/?cockpit=1&v=' + Date.now() + '#/dashboard');
+    await page.waitForTimeout(2500);
+    const blockDate = await page.evaluate(() => {
+      const el = document.querySelector('.block-insight .cockpit-block-count');
+      return el ? el.textContent.trim() : null;
+    });
+    if (blockDate !== apiDate) throw new Error('date mismatch: ' + blockDate + ' vs ' + apiDate);
+  });
+
   await t('API: DELETE /api/skills/:slug removes a skill', async () => {
     const slug = 'test-delete-' + Date.now();
     const created = await page.evaluate(async (s) => {
