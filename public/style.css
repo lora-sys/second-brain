@@ -3790,3 +3790,79 @@ body.cockpit-mode .app { display: none !important; }
   font-size: 12px; line-height: 1.6;
   white-space: pre-wrap; max-height: 400px; overflow: auto;
 }
+
+/* ============================================================================
+ * v0.9.x — Skills Manager Page
+ * Browse / create / edit skills in the cockpit.
+ * ========================================================================== */
+
+.cockpit-skills { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.cockpit-skills-hero {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 18px 22px; background: var(--surface-1);
+  border-radius: 12px; border: 1px solid var(--border-soft);
+}
+.cockpit-skills-hero svg { color: var(--accent-strong); flex-shrink: 0; margin-top: 2px; }
+.cockpit-skills-hero h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+.cockpit-skills-hero p { margin: 0; color: var(--text-soft); font-size: 13px; flex: 1; }
+.cockpit-skills-tags {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.cockpit-skills-tag {
+  padding: 4px 12px; background: var(--surface-2);
+  border: 1px solid var(--border-soft); border-radius: 14px;
+  font-size: 12px; color: var(--text);
+  font-family: var(--font-mono);
+}
+.cockpit-skills-tag-count { color: var(--text-soft); font-size: 10px; }
+.cockpit-skills-status {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+}
+.cockpit-skills-status-card {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 14px; background: var(--surface-1);
+  border-radius: 10px; border: 1px solid var(--border-soft);
+}
+.cockpit-skills-status-label {
+  font-size: 11px; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.cockpit-skills-status-value {
+  font-size: 24px; font-weight: 600;
+}
+.cockpit-skills-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+.cockpit-skills-item {
+  padding: 14px 16px;
+  background: var(--surface-1);
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--accent-strong, #7c3aed);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cockpit-skills-item:hover { background: var(--surface-2); }
+.cockpit-skills-item-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.cockpit-skills-item-emoji { font-size: 18px; }
+.cockpit-skills-item-name { font-size: 14px; font-weight: 600; flex: 1; }
+.cockpit-skills-item-slug {
+  font-size: 10px; padding: 2px 6px; background: var(--surface-3);
+  border-radius: 4px; color: var(--text-soft); font-family: var(--font-mono);
+}
+.cockpit-skills-item-desc {
+  font-size: 12px; color: var(--text-soft); line-height: 1.5; margin-bottom: 6px;
+}
+.cockpit-skills-item-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.cockpit-skills-item-tag {
+  font-size: 10px; padding: 2px 6px; background: var(--surface-3);
+  border-radius: 6px; color: var(--text-soft); font-family: var(--font-mono);
+}
+.cockpit-skills-empty {
+  padding: 30px 16px; background: var(--surface-1);
+  border-radius: 8px; border: 1px solid var(--border-soft);
+  text-align: center; color: var(--text-soft);
+}

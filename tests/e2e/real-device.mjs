@@ -33,7 +33,7 @@ async (page) => {
   });
   await t('cockpit: 10 nav items', async () => {
     const n = await page.evaluate(() => document.querySelectorAll('.cockpit-nav-item').length);
-    if (n !== 14) throw new Error('expected 14, got ' + n);
+    if (n !== 15) throw new Error('expected 15, got ' + n);
   });
   await t('cockpit: today has 3 blocks', async () => {
     const blocks = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-today-block .cockpit-block-title')).map(e => e.textContent));
@@ -328,6 +328,36 @@ async (page) => {
     });
     if (!r2.has) throw new Error('match did not return expected skill: ' + JSON.stringify(r2));
   });
+  await t('skills: page renders with new button', async () => {
+    await page.goto(BASE + '/?v=' + Date.now() + '#/skills');
+    await page.waitForTimeout(2500);
+    const has = await page.evaluate(() => !!document.querySelector('.cockpit-skills'));
+    if (!has) throw new Error('skills page did not render');
+    const hasBtn = await page.evaluate(() => !!document.getElementById('skill-new-btn'));
+    if (!hasBtn) throw new Error('no new-skill button');
+  });
+  await t('API: DELETE /api/skills/:slug removes a skill', async () => {
+    const slug = 'test-delete-' + Date.now();
+    const created = await page.evaluate(async (s) => {
+      const x = await fetch('/api/skills', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug: s, name: 'Test delete', description: 'x', tags: [], body: 'y' })
+      });
+      return x.ok;
+    }, slug);
+    if (!created) throw new Error('setup failed');
+    const deleted = await page.evaluate(async (s) => {
+      const x = await fetch('/api/skills/' + s, { method: 'DELETE' });
+      return x.ok;
+    }, slug);
+    if (!deleted) throw new Error('delete failed');
+    const readAfter = await page.evaluate(async (s) => {
+      const x = await fetch('/api/skills/' + s);
+      return x.status;
+    }, slug);
+    if (readAfter !== 404) throw new Error('expected 404 after delete, got ' + readAfter);
+  });
   await t('skills: create + read', async () => {
     const slug = 'test-skill-' + Date.now();
     const r = await page.evaluate(async (s) => {
@@ -519,44 +549,7 @@ async (page) => {
     });
     if (r < 0) throw new Error('skills endpoint did not return skills array');
   });
-  await t('skills: API match by query returns relevant skills', async () => {
-    // Create a skill with a unique tag for the test
-    const slug = 'test-match-' + Date.now();
-    const r = await page.evaluate(async (s) => {
-      const x = await fetch('/api/skills', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ slug: s, name: 'Test match skill', description: 'unique-marker-12345', tags: ['uniquetag' + Date.now()], body: 'x' })
-      });
-      return x.ok;
-    }, slug);
-    if (!r) throw new Error('setup skill create failed');
-    // Now query with the unique description as the search term
-    const r2 = await page.evaluate(async () => {
-      const x = await fetch('/api/skills?q=unique-marker-12345');
-      const d = await x.json();
-      return { count: d.skills.length, has: d.skills.some(s => s.description === 'unique-marker-12345') };
-    });
-    if (!r2.has) throw new Error('match did not return expected skill: ' + JSON.stringify(r2));
-  });
-  await t('skills: create + read', async () => {
-    const slug = 'test-skill-' + Date.now();
-    const r = await page.evaluate(async (s) => {
-      const x = await fetch('/api/skills', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ slug: s, name: 'Test skill', description: 'test', tags: ['test'], body: 'body' })
-      });
-      return x.ok;
-    }, slug);
-    if (!r) throw new Error('skill create failed');
-    const r2 = await page.evaluate(async (s) => {
-      const x = await fetch('/api/skills/' + s);
-      const d = await x.json();
-      return d && d.name === 'Test skill';
-    }, slug);
-    if (!r2) throw new Error('skill read failed');
-  });
+
   await t('API: POST /api/entities accepts decision type', async () => {
     const r = await page.evaluate(async () => {
       const x = await fetch('/api/entities', {
