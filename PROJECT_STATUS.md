@@ -38,7 +38,7 @@ _Last updated: 2026-07-12 by @coordinator_
 | #v0.4.c6.schedule | Cockpit 日程 section (timeline) | Cockpit UI | @coordinator | merged | ✅ Done |
 | #v0.4.c6.知识图谱 | Cockpit 知识图谱 section (wikilinks + tag overlap) | Cockpit UI | @coordinator | merged | ✅ Done |
 | #v0.4.c6.模板 | Cockpit 模板 section (12 starter templates) | Cockpit UI | @coordinator | merged | ✅ Done |
-| #v0.4.c6.* | 其他 1 个 placeholder section (智能体) | Cockpit UI | @coordinator | (follow-up) | Backlog |
+| #v0.4.c6.智能体 | Cockpit 智能体 section (local-echo agent) | Cockpit UI | @coordinator | merged | ✅ Done |
 | #v0.4.7 | Real-device E2E tests + 2 critical bug fixes | Test | @coordinator | merged | ✅ Done |
 | #v0.4.L1 | Landing page (Track 4) | Web | @coordinator | merged | ✅ Done |
 | #v0.4.L2 | GitHub Pages deploy + OpenGraph + custom domain | Web | @coordinator | (follow-up) | Backlog |
@@ -99,6 +99,7 @@ _None._
 
 | PR | Title | Evidence |
 |---|---|---|
+| `d340e5f` | merge: feature/v0.4.c6-agent (智能体 — last cockpit placeholder) | [docs/evidence/v0.4.c6-agent/](evidence/v0.4.c6-agent/) |
 | `3d6d660` | merge: feature/v0.4.c6-templates (templates section) | [docs/evidence/v0.4.c6-templates/](evidence/v0.4.c6-templates/) |
 | `259e396` | merge: feature/v0.4.c6-knowledge-graph (knowledge graph view) | [docs/evidence/v0.4.c6-knowledge/](evidence/v0.4.c6-knowledge/) |
 | `c148568` | merge: feature/v0.4.7-real-device-e2e (real-device E2E + 2 bug fixes) | [docs/evidence/v0.4.7-real-device/](evidence/v0.4.7-real-device/) |
