@@ -502,3 +502,15 @@
 - **Backend change** — `handleWeeklyList` now reads each weekly's body (first 400 chars) and includes it in the response.
 - **Bug fixed** — initial code had `const journals = []` but tried to reassign after the API call, causing silent failure. Fixed to `let`.
 - **205 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.14 insight widget E2E)
+
+- **3 E2E tests added** for the 最新周报 dashboard widget:
+  - `insight: dashboard insight widget renders latest weekly as markdown` — asserts markdown child or plain-text content is present
+  - `insight: insight block has a link to /weekly` — confirms the "看完整周报 →" link
+  - `insight: insight date matches latest weekly file` — fetches API date and verifies block's count badge
+- **Read-only DOM assertions** — safe to run in CI, no external side effects
+- **Pushed to origin main** — 206+ commits, project at v0.14
+- **Tests: 81 E2E + 49 Rust unit = 130 passing** (was 78+49=127 before v0.14)
+- **All 5 phases + ADR-0006 + v0.14 all shipped**
+
