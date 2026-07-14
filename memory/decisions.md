@@ -275,3 +275,13 @@
 - **28/28 E2E tests pass** — 5 new tests cover the templates page (renders, hero counts, 4 groups, 10+ cards, no SOON badge).
 - **Only 智能体 placeholder remains** — 11 of 12 cockpit sections are now real implementations.
 - **98 commits on main** — ahead of origin.
+
+## 2026-07-14 (v0.4.c6.智能体 agent shipped — COCKPIT COMPLETE)
+
+- **ALL 12 cockpit sidebar items are now real** — 智能体 was the last `soon` placeholder. The milestone test `cockpit: NO soon badges remain anywhere in sidebar` enforces this.
+- **Local-echo agent stub** — keyword-matched responses derived from vault state. 5 intent patterns (recent/tasks/friends/tags/projects). Real LLM in v0.5.
+- **34/34 E2E tests pass** — 6 new tests for the agent page.
+- **Cockpit final layout**: 今日 / 笔记库 / 知识图谱 / 任务 / 日程 / 回顾 / 资源库 / 模板 / 标签 / 智能体 / 设置 + dashboard. 12 of 12 sections real.
+- **CSS total ~3500 lines, JS app.js ~1900 lines, cockpit.js ~1300 lines, tests ~200 lines**. Project is solid for v0.4.
+- **Memory promotion**: the LocalEchoProvider in lib/llm/index.mjs is the formal spec; the cockpit's inline agent is a UI preview that mirrors the same intent interface. When v0.5 wires the real LLM, the cockpit just swaps `agentComplete` (the inline one) for a call to the formal provider via the bridge.
+- **104 commits on main** — pushed to origin.
