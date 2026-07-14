@@ -33,7 +33,7 @@ async (page) => {
   });
   await t('cockpit: 10 nav items', async () => {
     const n = await page.evaluate(() => document.querySelectorAll('.cockpit-nav-item').length);
-    if (n !== 12) throw new Error('expected 12, got ' + n);
+    if (n !== 13) throw new Error('expected 13, got ' + n);
   });
   await t('cockpit: today has 3 blocks', async () => {
     const blocks = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-today-block .cockpit-block-title')).map(e => e.textContent));
@@ -253,6 +253,34 @@ async (page) => {
     const has = await page.evaluate(() => !!document.querySelector('.cockpit-daily-timeline-day.has-journal'));
     if (!has) throw new Error('no has-journal cell');
   });
+  // ---- 周报 (v0.7) ----
+  await page.goto(BASE + '/?cockpit=1#/weekly');
+  await page.waitForTimeout(1500);
+  await t('weekly: page renders', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.cockpit-weekly'));
+    if (!has) throw new Error('weekly page did not render');
+  });
+  await t('weekly: has generate button', async () => {
+    const has = await page.evaluate(() => !!document.getElementById('weekly-generate-btn'));
+    if (!has) throw new Error('no generate button');
+  });
+  await t('weekly: clicking generate produces weekly report', async () => {
+    // Use Promise to wait for the post + render before checking state
+    await page.evaluate(() => new Promise(r => {
+      document.getElementById('weekly-generate-btn').click();
+      setTimeout(r, 600);
+    }));
+    const title = await page.evaluate(() => document.getElementById('weekly-view-title').textContent);
+    if (!title.includes('周报')) throw new Error('weekly title not set: ' + title);
+  });
+  await t('API: /api/weekly list returns weeklies array', async () => {
+    const n = await page.evaluate(async () => {
+      const x = await fetch('/api/weekly');
+      const d = await x.json();
+      return d && Array.isArray(d.weeklies) ? d.weeklies.length : -1;
+    });
+    if (n < 0) throw new Error('weekly endpoint did not return weeklies array');
+  });
   // ---- v0.6 backlinks ----
   await page.goto(BASE + '/?v=' + Date.now() + '#/entity/30-Projects/AI%20Engineering%20Harness');
   await page.waitForSelector('.entity-relations-grid', { timeout: 5000 }).catch(() => {});
@@ -353,6 +381,34 @@ async (page) => {
   await t('daily: timeline day with journal has-journal class', async () => {
     const has = await page.evaluate(() => !!document.querySelector('.cockpit-daily-timeline-day.has-journal'));
     if (!has) throw new Error('no has-journal cell');
+  });
+  // ---- 周报 (v0.7) ----
+  await page.goto(BASE + '/?cockpit=1#/weekly');
+  await page.waitForTimeout(1500);
+  await t('weekly: page renders', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.cockpit-weekly'));
+    if (!has) throw new Error('weekly page did not render');
+  });
+  await t('weekly: has generate button', async () => {
+    const has = await page.evaluate(() => !!document.getElementById('weekly-generate-btn'));
+    if (!has) throw new Error('no generate button');
+  });
+  await t('weekly: clicking generate produces weekly report', async () => {
+    // Use Promise to wait for the post + render before checking state
+    await page.evaluate(() => new Promise(r => {
+      document.getElementById('weekly-generate-btn').click();
+      setTimeout(r, 600);
+    }));
+    const title = await page.evaluate(() => document.getElementById('weekly-view-title').textContent);
+    if (!title.includes('周报')) throw new Error('weekly title not set: ' + title);
+  });
+  await t('API: /api/weekly list returns weeklies array', async () => {
+    const n = await page.evaluate(async () => {
+      const x = await fetch('/api/weekly');
+      const d = await x.json();
+      return d && Array.isArray(d.weeklies) ? d.weeklies.length : -1;
+    });
+    if (n < 0) throw new Error('weekly endpoint did not return weeklies array');
   });
   // ---- v0.6 backlinks ----
   await page.goto(BASE + '/?v=' + Date.now() + '#/entity/30-Projects/AI%20Engineering%20Harness');

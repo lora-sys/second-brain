@@ -3562,3 +3562,74 @@ body.cockpit-mode .app { display: none !important; }
   font-family: var(--font-mono);
   font-weight: 600;
 }
+
+/* ============================================================================
+ * v0.7 — Weekly Reflection Section
+ * Reuses daily CSS patterns.
+ * ========================================================================== */
+
+.cockpit-weekly { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.cockpit-weekly-hero {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 18px 22px; background: var(--surface-1);
+  border-radius: 12px; border: 1px solid var(--border-soft);
+}
+.cockpit-weekly-hero svg { color: var(--accent-strong); flex-shrink: 0; margin-top: 2px; }
+.cockpit-weekly-hero h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+.cockpit-weekly-hero p { margin: 0; color: var(--text-soft); font-size: 13px; }
+.cockpit-weekly-status {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+}
+.cockpit-weekly-status-card {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 14px; background: var(--surface-1);
+  border-radius: 10px; border: 1px solid var(--border-soft);
+}
+.cockpit-weekly-status-label {
+  font-size: 11px; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.cockpit-weekly-status-value {
+  font-size: 16px; font-weight: 600; font-family: var(--font-mono);
+}
+.cockpit-weekly-actions {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; background: var(--surface-1);
+  border-radius: 10px; border: 1px solid var(--border-soft);
+}
+.cockpit-weekly-actions-hint { font-size: 12px; color: var(--text-soft); }
+.cockpit-weekly-actions-hint code {
+  font-family: var(--font-mono); background: var(--surface-2);
+  padding: 2px 6px; border-radius: 4px; font-size: 11px;
+}
+.cockpit-weekly-list {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+.cockpit-weekly-list-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: var(--surface-1);
+  border-radius: 8px; border: 1px solid var(--border-soft);
+  text-decoration: none; color: var(--text);
+  font-size: 13px; font-family: var(--font-mono);
+  transition: background 0.15s;
+}
+.cockpit-weekly-list-item:hover { background: var(--surface-2); }
+.cockpit-weekly-list-arrow { color: var(--text-soft); }
+.cockpit-weekly-empty {
+  padding: 30px 16px; background: var(--surface-1);
+  border-radius: 8px; border: 1px solid var(--border-soft);
+  text-align: center; color: var(--text-soft);
+}
+.cockpit-weekly-view {
+  padding: 16px 18px; background: var(--surface-1);
+  border-radius: 10px; border: 1px solid var(--border-soft);
+}
+.cockpit-weekly-view h2 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
+.cockpit-weekly-view-content {
+  margin: 0; padding: 14px; background: var(--surface-2);
+  border-radius: 8px; font-family: var(--font-mono);
+  font-size: 12px; line-height: 1.6; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 480px; overflow: auto;
+}
