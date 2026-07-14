@@ -1180,14 +1180,15 @@
   async function preloadAllEntities() {
     if (state.allEntities.length > 0) return;
     try {
-      const [p, t, pr, l] = await Promise.all([
-        api.list('person'), api.list('task'), api.list('project'), api.list('link'),
+      const [p, t, pr, l, dc] = await Promise.all([
+        api.list('person'), api.list('task'), api.list('project'), api.list('link'), api.list('decision'),
       ]);
       const all = [];
       for (const e of p) all.push({ type: 'person', slug: e.slug, label: e.data.name || e.slug });
       for (const e of t) all.push({ type: 'task', slug: e.slug, label: e.data.title || e.slug });
       for (const e of pr) all.push({ type: 'project', slug: e.slug, label: e.data.title || e.slug });
       for (const e of l) all.push({ type: 'link', slug: e.slug, label: e.data.title || e.slug });
+      for (const e of dc) all.push({ type: 'decision', slug: e.slug, label: e.data.title || e.data.name || e.slug });
       // Dedup
       const seen = new Set();
       state.allEntities = all.filter((m) => {
@@ -1842,6 +1843,7 @@
       api.list('task').then((d) => state.entities.task = d),
       api.list('project').then((d) => state.entities.project = d),
       api.list('link').then((d) => state.entities.link = d),
+      api.list('decision').then((d) => state.entities.decision = d),
     ]).then(() => render()).catch(() => render());
 
     setTimeout(() => input.focus(), 30);
@@ -1922,6 +1924,7 @@
     if (route === 'weekly') return 'weekly';
     if (route === 'templates') return 'templates';
     if (route === 'agent') return 'agent';
+    if (route === 'decisions') return 'decisions';
     if (route === 'settings') return 'settings';
     if (route === 'review') return 'review';
     if (route === 'schedule') return 'schedule';
@@ -1941,6 +1944,7 @@
     if (route === 'weekly') return 'weekly';
     if (route === 'templates') return 'templates';
     if (route === 'agent') return 'agent';
+    if (route === 'decisions') return 'decisions';
     if (route === 'settings') return 'settings';
     if (route === 'schedule') return 'schedule';
     if (route === 'notes') return 'notes';
@@ -1961,7 +1965,7 @@
     // Pre-load entities so the cockpit today panel has data to render.
     if (api.list) {
       api.list().then((items) => {
-        const buckets = { person: [], task: [], project: [], link: [] };
+        const buckets = { person: [], task: [], project: [], link: [], decision: [] };
         for (const it of items) (buckets[it.type] || buckets.link).push(it);
         state.entities = buckets;
         // Re-render with the current route, not hardcoded 'dashboard'.

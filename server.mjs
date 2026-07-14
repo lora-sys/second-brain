@@ -23,6 +23,7 @@ async function ensureConfig() {
         task: '20-Tasks',
         project: '30-Projects',
         link: '40-Links',
+        decision: '50-Decisions',
         dashboard: '00-Dashboard',
       },
     };
