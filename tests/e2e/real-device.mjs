@@ -33,7 +33,7 @@ async (page) => {
   });
   await t('cockpit: 10 nav items', async () => {
     const n = await page.evaluate(() => document.querySelectorAll('.cockpit-nav-item').length);
-    if (n !== 11) throw new Error('expected 11, got ' + n);
+    if (n !== 12) throw new Error('expected 12, got ' + n);
   });
   await t('cockpit: today has 3 blocks', async () => {
     const blocks = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-today-block .cockpit-block-title')).map(e => e.textContent));
@@ -180,6 +180,59 @@ async (page) => {
     const tplEntry = labels.find(l => l.text.includes('模板'));
     if (!tplEntry) throw new Error('no 模板 nav item');
     if (tplEntry.soon) throw new Error('BUG: 模板 still shows soon badge but renderTemplates exists');
+  });
+
+  // ---- 日记 (v0.5) ----
+  await page.goto(BASE + '/?cockpit=1#/daily');
+  await page.waitForTimeout(1500);
+  await t('daily: page renders', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.cockpit-daily'));
+    if (!has) throw new Error('daily page did not render');
+  });
+  await t('daily: has generate button', async () => {
+    const has = await page.evaluate(() => !!document.getElementById('daily-generate-btn'));
+    if (!has) throw new Error('no generate button');
+  });
+  await t('daily: status cards present (provider/events/total)', async () => {
+    const labels = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-daily-status-label')).map(e => e.textContent));
+    for (const need of ['Provider', 'Events today', 'Journals total']) {
+      if (!labels.includes(need)) throw new Error('missing status card: ' + need);
+    }
+  });
+  await t('daily: clicking generate produces daily journal', async () => {
+    await page.evaluate(() => document.getElementById('daily-generate-btn').click());
+    await page.waitForTimeout(2000);
+    const viewVisible = await page.evaluate(() => {
+      const v = document.getElementById('daily-view');
+      return v && v.style.display !== 'none';
+    });
+    if (!viewVisible) throw new Error('daily view did not appear after click');
+    const content = await page.evaluate(() => {
+      const el = document.getElementById('daily-view-content');
+      return el ? el.textContent : '';
+    });
+    if (!content || content.length < 50) throw new Error('daily content too short: ' + content.length);
+    if (!content.includes('日记')) throw new Error('daily content missing 日记 marker');
+  });
+  await t('API: /api/events returns array', async () => {
+    const n = await page.evaluate(async () => {
+      const x = await fetch('/api/events?days=7');
+      const d = await x.json();
+      return d && Array.isArray(d.events) ? d.events.length : -1;
+    });
+    if (n < 0) throw new Error('events endpoint did not return array');
+  });
+  await t('API: /api/daily returns object with journals array', async () => {
+    const n = await page.evaluate(async () => {
+      const x = await fetch('/api/daily');
+      const d = await x.json();
+      return d && Array.isArray(d.journals) ? d.journals.length : -1;
+    });
+    if (n < 0) throw new Error('daily endpoint did not return journals array');
+  });
+  await t('cockpit: NO soon badges remain anywhere in sidebar', async () => {
+    const soonItems = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-nav-item.is-soon')).map(el => el.textContent.trim()));
+    if (soonItems.length > 0) throw new Error('still has soon badges: ' + soonItems.join(', '));
   });
 
   // ---- 智能体 ----

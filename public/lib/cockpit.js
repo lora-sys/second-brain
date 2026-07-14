@@ -19,6 +19,7 @@
     { hash: '#/dashboard', label: '今日', icon: 'home', impl: 'dashboard' },
     { hash: '#/notes', label: '笔记库', icon: 'note', impl: 'notes' },
     { hash: '#/knowledge', label: '知识图谱', icon: 'graph', impl: 'knowledge' },
+    { hash: '#/daily', label: '日记', icon: 'book', impl: 'daily' },
     { hash: '#/tasks', label: '任务', icon: 'check', impl: 'tasks' },
     { hash: '#/schedule', label: '日程', icon: 'calendar', impl: 'schedule' },
     { hash: '#/review', label: '回顾', icon: 'eye', impl: 'review' },
@@ -1566,7 +1567,7 @@
     const type = findTemplateType(tpl.id);
     if (!type) return;
     try {
-      const created = await window.__api.create({ type, title, body: tpl.body, data: { tags: tpl.tags } });
+      const created = await window.__api.api.create({ type, title, body: tpl.body, data: { tags: tpl.tags } });
       toast('已创建:' + title, 'success');
       // Navigate to the new entity
       if (created && created.id) {
@@ -1582,7 +1583,144 @@
     }
   }
 
-    // -------------------- Knowledge graph helpers (v0.4.c6.知识图谱) --------------------
+    // -------------------- Daily journal helpers (v0.5) --------------------
+  async function renderDaily(state) {
+    // Fetch list of recent journals
+    let journals = [];
+    try {
+      const r = await window.__api.api.get('/api/daily');
+      journals = (r && r.journals) || [];
+    } catch (e) { console.warn('[daily] list failed:', e.message); }
+    const today = formatToday();
+    const todayJournal = journals.find(j => j.date === today);
+    const otherJournals = journals.filter(j => j.date !== today);
+    const hero = [
+      '<header class="cockpit-daily-hero">',
+        icon('book', 24),
+        '<div>',
+          '<h1>日记</h1>',
+          '<p>从事件流生成的每日反思。Local-echo 默认,接 Ollama/OpenAI 时切换。</p>',
+        '</div>',
+      '</header>'
+    ].join('');
+    const statusCards = [
+      '<section class="cockpit-daily-status">',
+        '<div class="cockpit-daily-status-card">',
+          '<span class="cockpit-daily-status-label">Provider</span>',
+          '<span class="cockpit-daily-status-value">local-echo</span>',
+        '</div>',
+        '<div class="cockpit-daily-status-card">',
+          '<span class="cockpit-daily-status-label">Events today</span>',
+          '<span class="cockpit-daily-status-value" id="daily-events-count">—</span>',
+        '</div>',
+        '<div class="cockpit-daily-status-card">',
+          '<span class="cockpit-daily-status-label">Journals total</span>',
+          '<span class="cockpit-daily-status-value">' + journals.length + '</span>',
+        '</div>',
+      '</section>'
+    ].join('');
+    const actions = [
+      '<section class="cockpit-daily-actions">',
+        '<button class="btn btn-primary" id="daily-generate-btn">生成今天的日记</button>',
+        '<span class="cockpit-daily-actions-hint">写入 <code>00-Daily/' + esc(today) + '.md</code></span>',
+      '</section>'
+    ].join('');
+    const list = otherJournals.length === 0
+      ? '<div class="cockpit-daily-empty"><p>没有历史日记。生成第一篇吧。</p></div>'
+      : '<div class="cockpit-daily-list">' + otherJournals.map(j =>
+          '<a class="cockpit-daily-list-item" href="#" data-daily-date="' + esc(j.date) + '">' +
+            '<span class="cockpit-daily-list-date">' + esc(j.date) + '</span>' +
+            '<span class="cockpit-daily-list-arrow">→</span>' +
+          '</a>'
+        ).join('') + '</div>';
+    const listSection = [
+      '<section class="cockpit-daily-history">',
+        '<h2>历史日记</h2>',
+        list,
+      '</section>'
+    ].join('');
+    const view = [
+      '<section class="cockpit-daily-view" id="daily-view" style="display:none">',
+        '<h2 id="daily-view-title"></h2>',
+        '<pre class="cockpit-daily-view-content" id="daily-view-content"></pre>',
+      '</section>'
+    ].join('');
+    return ['<div class="cockpit-daily">', hero, statusCards, actions, listSection, view, '</div>'].join('');
+  }
+
+  function formatToday() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  }
+
+  function bindDailyActions(content) {
+    const btn = content.querySelector('#daily-generate-btn');
+    if (btn) btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '生成中…';
+      try {
+        const r = await window.__api.api.post('/api/daily', { days: 1 });
+        if (r && r.ok) {
+          toast('日记已写入 ' + r.path, 'success');
+          // Reload the page to show the new journal
+          const view = content.querySelector('#daily-view');
+          const title = content.querySelector('#daily-view-title');
+          const body = content.querySelector('#daily-view-content');
+          view.style.display = 'block';
+          title.textContent = r.date + ' 日记';
+          body.textContent = r.content;
+          view.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          toast('生成失败', 'error');
+        }
+      } catch (e) {
+        toast('生成失败:' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '生成今天的日记';
+      }
+    });
+    // Click historical journal to view
+    content.querySelectorAll('[data-daily-date]').forEach(a => {
+      a.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const date = a.getAttribute('data-daily-date');
+        const view = content.querySelector('#daily-view');
+        const title = content.querySelector('#daily-view-title');
+        const body = content.querySelector('#daily-view-content');
+        title.textContent = '加载中…';
+        body.textContent = '';
+        view.style.display = 'block';
+        try {
+          const r = await window.__api.api.get('/api/daily/' + date);
+          if (r && r.content) {
+            title.textContent = r.date + ' 日记';
+            body.textContent = r.content;
+          } else {
+            title.textContent = date + ' (未找到)';
+            body.textContent = '';
+          }
+        } catch (e) {
+          title.textContent = '加载失败';
+          body.textContent = e.message;
+        }
+        view.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+    // Fetch today's event count
+    (async () => {
+      try {
+        const r = await window.__api.api.get('/api/events?days=1');
+        const el = content.querySelector('#daily-events-count');
+        if (el && r && Array.isArray(r.events)) el.textContent = r.events.length;
+      } catch (e) {}
+    })();
+  }
+
+  // -------------------- Knowledge graph helpers (v0.4.c6.知识图谱) --------------------
   // Build a graph from wikilinks + shared tags. Two entities are connected if:
   //   - One has a wikilink to the other ([[type/slug]] or [[slug]])
   //   - They share at least one tag
@@ -1792,6 +1930,11 @@
       }
       if (route === 'knowledge') {
         content.innerHTML = renderKnowledge(state);
+        return;
+      }
+      if (route === 'daily') {
+        content.innerHTML = await renderDaily(state);
+        bindDailyActions(content);
         return;
       }
       if (route === 'templates') {
