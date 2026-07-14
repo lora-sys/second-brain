@@ -410,3 +410,16 @@
 - **v0.7.0-alpha tagged and pushed** — Phase 4 of roadmap (Reflection) starts.
 - **Weekly reflection** is the first deliverable. Decision journal (v0.8) next.
 - **66 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.8.0-alpha released)
+
+- **v0.8.0-alpha tagged and pushed** — Decision Journal (Phase 4 of roadmap, last item before v0.9+ Personal Agent).
+- **Major features**:
+  - New `decision` entity type with full schema (context, options, decision, status, retrospective, outcome, madeAt, tags)
+  - 4-section cockpit 决策 page (总数/待回顾/已回顾/需回顾 30+天)
+  - Retrospective modal with outcome tracking (good/neutral/bad)
+  - Age badges (今天/N天前) on each card
+  - 30-day pending reminder (⏰ icon)
+- **72 E2E + 49 Rust unit = 121 tests passing**.
+- **Phase 4 of roadmap (Decision Journal) done**. Next: v0.9+ (Personal Agent + Skill distillation).
+- **172 commits on main** — pushed to origin.
