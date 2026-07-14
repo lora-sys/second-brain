@@ -1176,7 +1176,53 @@
     const input = content.querySelector('#agent-input');
     const sendBtn = content.querySelector('#agent-send');
     const conversation = content.querySelector('#agent-conversation');
-    const send = (text) => {
+    const AGENT_STORAGE_KEY = 'sb-agent-history-v1';
+  // Load saved history
+  const savedHistory = (() => {
+    try {
+      const raw = localStorage.getItem(AGENT_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      return null;
+    } catch (e) { return null; }
+  })();
+  // Render saved messages on initial paint
+  if (savedHistory && savedHistory.length > 0) {
+    const emptyEl = conversation.querySelector('.cockpit-agent-empty');
+    if (emptyEl) emptyEl.remove();
+    savedHistory.forEach(msg => {
+      conversation.insertAdjacentHTML('beforeend', msg.html);
+    });
+    conversation.scrollTop = conversation.scrollHeight;
+  }
+  // Add a "clear history" button to the composer
+  const composerActions = content.querySelector('.cockpit-agent-composer-actions');
+  if (composerActions && savedHistory) {
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'btn btn-ghost btn-sm';
+    clearBtn.textContent = '清空历史';
+    clearBtn.id = 'agent-clear-btn';
+    composerActions.appendChild(clearBtn);
+    clearBtn.addEventListener('click', () => {
+      if (confirm('清空对话历史?')) {
+        try { localStorage.removeItem(AGENT_STORAGE_KEY); } catch (e) {}
+        conversation.innerHTML = '<div class="cockpit-agent-empty"><svg viewBox="0 0 24 24" width="28" height="28"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"></path></svg><h2>开始对话</h2><p>试试快捷问题,或者直接在下面输入想问的。</p></div>';
+        clearBtn.remove();
+      }
+    });
+  }
+
+  const saveHistory = () => {
+    try {
+      const messages = Array.from(conversation.querySelectorAll('.cockpit-agent-msg')).map(el => ({
+        html: el.outerHTML,
+      }));
+      localStorage.setItem(AGENT_STORAGE_KEY, JSON.stringify(messages));
+    } catch (e) {}
+  };
+
+  const send = (text) => {
       if (!text || !text.trim()) return;
       // Render user message
       const userMsg = [
@@ -1197,6 +1243,7 @@
       if (emptyEl) emptyEl.remove();
       conversation.insertAdjacentHTML('beforeend', userMsg + thinking);
       conversation.scrollTop = conversation.scrollHeight;
+      saveHistory();
       // Process after a tiny delay so the thinking state is visible
       setTimeout(async () => {
         const result = agentComplete(text, state);
@@ -1214,6 +1261,7 @@
           msgEl.querySelector('.cockpit-agent-msg-body').innerHTML = bodyHtml;
         }
         conversation.scrollTop = conversation.scrollHeight;
+        saveHistory();
       }, 200);
     };
     sendBtn.addEventListener('click', () => {
