@@ -1019,6 +1019,7 @@
     { id: 'projects',  label: '活跃的项目', prompt: '我现在有哪些 active 状态的项目?' },
     { id: 'create-task', label: '新建任务: ...', prompt: '帮我新建一个任务: 写 v0.5 release notes', tool: true },
     { id: 'mark-done', label: '把最新任务标完成', prompt: '把最新的 open 任务标成 done', tool: true },
+    { id: 'save-skill', label: '保存当前对话为 skill', prompt: '__save_skill__', tool: true },
   ];
 
   // Local-echo provider: deterministic, keyword-matched.
@@ -1113,7 +1114,7 @@
     };
   }
 
-  function renderAgent(state) {
+  async function renderAgent(state) {
     const quickPromptsHtml = AGENT_QUICK_PROMPTS.map(p =>
       '<button class="cockpit-agent-quick-btn" data-agent-prompt="' + esc(p.prompt) + '">' + esc(p.label) + '</button>'
     ).join('');
@@ -1146,7 +1147,22 @@
         '</div>',
       '</section>'
     ].join('');
+    // Load available skills for the skill chip bar
+    let skillsList = [];
+    try {
+      const r = await window.__api.api.get('/api/skills');
+      skillsList = (r && r.skills) || [];
+    } catch (e) { console.warn('[agent] skills list failed:', e.message); }
+    const skillsHtml = skillsList.length > 0
+      ? '<div class="cockpit-agent-skills">' +
+          '<div class="cockpit-agent-skills-label">可用 skills:</div>' +
+          skillsList.map(sk =>
+            '<span class="cockpit-agent-skill-chip" data-skill-slug="' + esc(sk.slug) + '" title="' + esc(sk.description) + '">' + esc(sk.name) + '</span>'
+          ).join('') +
+        '</div>'
+      : '';
     const conversation = [
+      skillsHtml,
       '<section class="cockpit-agent-conversation" id="agent-conversation">',
         '<div class="cockpit-agent-empty">',
           icon('sparkle', 28),
@@ -1252,7 +1268,6 @@
         const msgEl = document.getElementById(thinkingId);
         if (msgEl) {
           let bodyHtml = '<pre class="cockpit-agent-response-text">' + esc(result.text) + '</pre>';
-          // Execute actions and append results
           if (result.actions && result.actions.length > 0) {
             const actionResults = await executeActions(result.actions, state);
             bodyHtml += renderActionsHtml(result.actions, actionResults);
@@ -1260,7 +1275,12 @@
           bodyHtml += '<div class="cockpit-agent-response-meta">' +
             esc(result.provider) + ' · ' + esc(result.model) + ' · ' + result.durationMs + 'ms' +
           '</div>';
+          if (result.text && result.text.length > 30) {
+            bodyHtml += '<div class="cockpit-agent-skill-save"><button class="btn btn-ghost btn-sm" data-save-skill-from-msg>↻ 存为 skill</button></div>';
+          }
           msgEl.querySelector('.cockpit-agent-msg-body').innerHTML = bodyHtml;
+          const saveBtn = msgEl.querySelector('[data-save-skill-from-msg]');
+          if (saveBtn) saveBtn.addEventListener('click', () => openSaveSkillModal(result.text, result.actions || []));
         }
         conversation.scrollTop = conversation.scrollHeight;
         saveHistory();
@@ -1280,11 +1300,22 @@
     content.querySelectorAll('[data-agent-prompt]').forEach(btn => {
       btn.addEventListener('click', () => {
         const prompt = btn.getAttribute('data-agent-prompt');
+        if (prompt === '__save_skill__') {
+          const lastAssistant = conversation.querySelectorAll('.cockpit-agent-msg-assistant .cockpit-agent-response-text');
+          const last = lastAssistant[lastAssistant.length - 1];
+          if (last) {
+            openSaveSkillModal(last.textContent, []);
+          } else if (window.toast) {
+            window.toast('没有可保存的对话', 'error');
+          }
+          return;
+        }
         input.value = prompt;
         send(prompt);
         input.value = '';
       });
     });
+    bindSkillChips(content);
   }
 
   // Execute actions emitted by the agent (tool-use).
@@ -1341,7 +1372,75 @@
     '</div>';
   }
 
-    // -------------------- Templates (v0.4.c6.模板) --------------------
+    // -------------------- Skills (v0.9) --------------------
+  function openSaveSkillModal(text, actions) {
+    const html = '<div class="editor">' +
+      '<div class="editor-row"><label>Skill 名称</label><input id="sk-name" placeholder="比如:总结一周活动" /></div>' +
+      '<div class="editor-row"><label>描述</label><input id="sk-desc" placeholder="一句话说明这个 skill 做什么" /></div>' +
+      '<div class="editor-row"><label>标签 (逗号分隔)</label><input id="sk-tags" placeholder="weekly, summary, events" /></div>' +
+      '<div class="editor-row"><label>Body</label><textarea id="sk-body" rows="8"></textarea></div>' +
+    '</div>';
+    setTimeout(() => {
+      const b = document.getElementById('sk-body');
+      if (b) b.value = text || '';
+    }, 50);
+    if (typeof window.openModal !== 'function') return;
+    window.openModal({
+      title: '存为 skill',
+      type: 'skill',
+      body: html,
+      footer: '<button class="btn" data-close>取消</button><button class="btn btn-primary" id="sk-submit">保存</button>'
+    });
+    setTimeout(() => {
+      const submit = document.getElementById('sk-submit');
+      if (!submit) return;
+      submit.addEventListener('click', async () => {
+        const name = (document.getElementById('sk-name').value || '').trim();
+        const desc = (document.getElementById('sk-desc').value || '').trim();
+        const tags = (document.getElementById('sk-tags').value || '').split(',').map(t => t.trim()).filter(Boolean);
+        const body = (document.getElementById('sk-body').value || '').trim();
+        if (!name || !body) { if (window.toast) window.toast('名称和 body 必填', 'error'); return; }
+        const slug = name.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || ('skill-' + Date.now());
+        try {
+          await window.__api.api.post('/api/skills', { slug, name, description: desc, tags, body });
+          if (window.toast) window.toast('Skill 已存到 00-AI/skills/', 'success');
+          if (typeof window.closeModal === 'function') window.closeModal();
+          setTimeout(() => {
+            const hash = location.hash;
+            location.hash = '';
+            setTimeout(() => { location.hash = hash; }, 50);
+          }, 500);
+        } catch (e) {
+          if (window.toast) window.toast('保存失败:' + e.message, 'error');
+        }
+      });
+    }, 60);
+  }
+
+  function bindSkillChips(content) {
+    content.querySelectorAll('.cockpit-agent-skill-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        openSkillViewerModal(chip.getAttribute('data-skill-slug'));
+      });
+    });
+  }
+
+  async function openSkillViewerModal(slug) {
+    let skill;
+    try { skill = await window.__api.api.get('/api/skills/' + encodeURIComponent(slug)); }
+    catch (e) { if (window.toast) window.toast('加载失败:' + e.message, 'error'); return; }
+    if (!skill) return;
+    const body = '<div class="skill-viewer"><pre>' + esc(skill.body || '') + '</pre></div>';
+    if (typeof window.openModal !== 'function') return;
+    window.openModal({
+      title: 'Skill: ' + esc(skill.name || slug),
+      type: 'skill',
+      body: body,
+      footer: '<button class="btn" data-close>关闭</button>'
+    });
+  }
+
+  // -------------------- Templates (v0.4.c6.模板) --------------------
   // Pre-defined starter templates per entity type. Each template pre-fills
   // the body + tags when the user picks it from the cockpit Templates page
   // or from the quick-add flow. Templates live in JS, not in the vault,
@@ -2472,7 +2571,7 @@
         return;
       }
       if (route === 'agent') {
-        content.innerHTML = renderAgent(state);
+        content.innerHTML = await renderAgent(state);
         bindAgentActions(content, state);
         return;
       }

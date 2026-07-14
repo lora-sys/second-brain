@@ -3750,3 +3750,43 @@ body.cockpit-mode .app { display: none !important; }
   padding: 4px 0;
 }
 .cockpit-decision-status-needs { color: #dc2626; }
+
+/* ============================================================================
+ * v0.9 — Skills
+ * Skill chip bar in agent + save-skill button.
+ * ========================================================================== */
+
+.cockpit-agent-skills {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; background: var(--surface-2);
+  border-radius: 8px; margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.cockpit-agent-skills-label {
+  font-size: 11px; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;
+}
+.cockpit-agent-skill-chip {
+  display: inline-block; padding: 3px 10px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  font-size: 12px; color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.cockpit-agent-skill-chip:hover {
+  background: var(--accent-soft, rgba(124,58,237,0.1));
+  border-color: var(--accent-strong, #7c3aed);
+}
+.cockpit-agent-skill-save {
+  margin-top: 8px; text-align: right;
+}
+.skill-viewer pre {
+  margin: 0; padding: 14px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px; line-height: 1.6;
+  white-space: pre-wrap; max-height: 400px; overflow: auto;
+}

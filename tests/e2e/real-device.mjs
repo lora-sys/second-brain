@@ -300,6 +300,32 @@ async (page) => {
     const has = await page.evaluate(() => !!document.getElementById('decision-new-btn'));
     if (!has) throw new Error('no new decision button');
   });
+  await t('API: /api/skills list returns array', async () => {
+    const r = await page.evaluate(async () => {
+      const x = await fetch('/api/skills');
+      const d = await x.json();
+      return d && Array.isArray(d.skills) ? d.skills.length : -1;
+    });
+    if (r < 0) throw new Error('skills endpoint did not return skills array');
+  });
+  await t('skills: create + read', async () => {
+    const slug = 'test-skill-' + Date.now();
+    const r = await page.evaluate(async (s) => {
+      const x = await fetch('/api/skills', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug: s, name: 'Test skill', description: 'test', tags: ['test'], body: 'body' })
+      });
+      return x.ok;
+    }, slug);
+    if (!r) throw new Error('skill create failed');
+    const r2 = await page.evaluate(async (s) => {
+      const x = await fetch('/api/skills/' + s);
+      const d = await x.json();
+      return d && d.name === 'Test skill';
+    }, slug);
+    if (!r2) throw new Error('skill read failed');
+  });
   await t('API: POST /api/entities accepts decision type', async () => {
     const r = await page.evaluate(async () => {
       const x = await fetch('/api/entities', {
@@ -363,7 +389,7 @@ async (page) => {
     const input = await page.evaluate(() => !!document.getElementById('agent-input'));
     if (!input) throw new Error('no composer input');
     const n = await page.evaluate(() => document.querySelectorAll('.cockpit-agent-quick-btn').length);
-    if (n !== 7) throw new Error('expected 7 quick prompts, got ' + n);
+    if (n !== 8) throw new Error('expected 8 quick prompts, got ' + n);
   });
   await t('agent: clicking quick prompt produces assistant reply', async () => {
     // Click the "我有哪些未完成任务?" quick prompt
@@ -464,6 +490,32 @@ async (page) => {
   await t('decisions: has new-decision button', async () => {
     const has = await page.evaluate(() => !!document.getElementById('decision-new-btn'));
     if (!has) throw new Error('no new decision button');
+  });
+  await t('API: /api/skills list returns array', async () => {
+    const r = await page.evaluate(async () => {
+      const x = await fetch('/api/skills');
+      const d = await x.json();
+      return d && Array.isArray(d.skills) ? d.skills.length : -1;
+    });
+    if (r < 0) throw new Error('skills endpoint did not return skills array');
+  });
+  await t('skills: create + read', async () => {
+    const slug = 'test-skill-' + Date.now();
+    const r = await page.evaluate(async (s) => {
+      const x = await fetch('/api/skills', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug: s, name: 'Test skill', description: 'test', tags: ['test'], body: 'body' })
+      });
+      return x.ok;
+    }, slug);
+    if (!r) throw new Error('skill create failed');
+    const r2 = await page.evaluate(async (s) => {
+      const x = await fetch('/api/skills/' + s);
+      const d = await x.json();
+      return d && d.name === 'Test skill';
+    }, slug);
+    if (!r2) throw new Error('skill read failed');
   });
   await t('API: POST /api/entities accepts decision type', async () => {
     const r = await page.evaluate(async () => {
