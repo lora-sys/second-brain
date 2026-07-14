@@ -308,6 +308,26 @@ async (page) => {
     });
     if (r < 0) throw new Error('skills endpoint did not return skills array');
   });
+  await t('skills: API match by query returns relevant skills', async () => {
+    // Create a skill with a unique tag for the test
+    const slug = 'test-match-' + Date.now();
+    const r = await page.evaluate(async (s) => {
+      const x = await fetch('/api/skills', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug: s, name: 'Test match skill', description: 'unique-marker-12345', tags: ['uniquetag' + Date.now()], body: 'x' })
+      });
+      return x.ok;
+    }, slug);
+    if (!r) throw new Error('setup skill create failed');
+    // Now query with the unique description as the search term
+    const r2 = await page.evaluate(async () => {
+      const x = await fetch('/api/skills?q=unique-marker-12345');
+      const d = await x.json();
+      return { count: d.skills.length, has: d.skills.some(s => s.description === 'unique-marker-12345') };
+    });
+    if (!r2.has) throw new Error('match did not return expected skill: ' + JSON.stringify(r2));
+  });
   await t('skills: create + read', async () => {
     const slug = 'test-skill-' + Date.now();
     const r = await page.evaluate(async (s) => {
@@ -498,6 +518,26 @@ async (page) => {
       return d && Array.isArray(d.skills) ? d.skills.length : -1;
     });
     if (r < 0) throw new Error('skills endpoint did not return skills array');
+  });
+  await t('skills: API match by query returns relevant skills', async () => {
+    // Create a skill with a unique tag for the test
+    const slug = 'test-match-' + Date.now();
+    const r = await page.evaluate(async (s) => {
+      const x = await fetch('/api/skills', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug: s, name: 'Test match skill', description: 'unique-marker-12345', tags: ['uniquetag' + Date.now()], body: 'x' })
+      });
+      return x.ok;
+    }, slug);
+    if (!r) throw new Error('setup skill create failed');
+    // Now query with the unique description as the search term
+    const r2 = await page.evaluate(async () => {
+      const x = await fetch('/api/skills?q=unique-marker-12345');
+      const d = await x.json();
+      return { count: d.skills.length, has: d.skills.some(s => s.description === 'unique-marker-12345') };
+    });
+    if (!r2.has) throw new Error('match did not return expected skill: ' + JSON.stringify(r2));
   });
   await t('skills: create + read', async () => {
     const slug = 'test-skill-' + Date.now();

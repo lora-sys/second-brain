@@ -1025,7 +1025,9 @@
   // Local-echo provider: deterministic, keyword-matched.
   // Supports [ACTION:type:arg=value] directives in prompts. When detected,
   // the agent generates the corresponding action alongside the response.
-  function agentComplete(prompt, state) {
+  // Skills (loaded by bindAgentActions) get injected into the default branch
+  // so the response mentions them when nothing else matches.
+  function agentComplete(prompt, state, skills) {
     const t0 = Date.now();
     const p = (prompt || '').toLowerCase();
     const e = (state && state.entities) || {};
@@ -1033,6 +1035,7 @@
     for (const type of ['person', 'task', 'project', 'link']) {
       for (const item of (e[type] || [])) flat.push({ ...item, _type: type });
     }
+    const loadedSkills = skills || [];
     // Detect intent for actions
     const actions = [];
     if (/新建.*任务|帮我.*任务|create.*task/i.test(prompt)) {
@@ -1100,10 +1103,15 @@
     } else if (/hello|hi|你好/.test(prompt)) {
       text = '你好!我是 Second Brain 的本地智能体(目前是 local-echo 模式)。试试上面的快捷问题,或者随便问我点啥。';
     } else {
-      // Default: count summary
+      // Default: vault summary + injected skills
+      const skillList = loadedSkills.length > 0
+        ? '\n\n可用的 skills (' + loadedSkills.length + '):\n' +
+          loadedSkills.map(s => '- ' + s.name + (s.description ? ': ' + s.description : '')).join('\n')
+        : '';
       text = `[local-echo] 你的 vault 现在有 ${(e.person || []).length} 个人物、` +
         `${(e.task || []).length} 个任务、${(e.project || []).length} 个项目、` +
-        `${(e.link || []).length} 个链接。试试问「总结最近的活动」或「我有哪些未完成任务」。`;
+        `${(e.link || []).length} 个链接。试试问「总结最近的活动」或「我有哪些未完成任务」。` +
+        skillList;
     }
     return {
       text,
@@ -1111,6 +1119,7 @@
       model: 'local-echo-deterministic-stub',
       provider: 'local-echo',
       actions,
+      skillsLoaded: loadedSkills.length,
     };
   }
 
@@ -1264,7 +1273,13 @@
       saveHistory();
       // Process after a tiny delay so the thinking state is visible
       setTimeout(async () => {
-        const result = agentComplete(text, state);
+        // Fetch matching skills for this prompt
+        let matchedSkills = [];
+        try {
+          const r = await window.__api.api.get('/api/skills?q=' + encodeURIComponent(text));
+          matchedSkills = (r && r.skills) || [];
+        } catch (e) { /* ignore */ }
+        const result = agentComplete(text, state, matchedSkills);
         const msgEl = document.getElementById(thinkingId);
         if (msgEl) {
           let bodyHtml = '<pre class="cockpit-agent-response-text">' + esc(result.text) + '</pre>';
@@ -1274,6 +1289,7 @@
           }
           bodyHtml += '<div class="cockpit-agent-response-meta">' +
             esc(result.provider) + ' · ' + esc(result.model) + ' · ' + result.durationMs + 'ms' +
+            (result.skillsLoaded ? ' · ' + result.skillsLoaded + ' skill(s) 注入' : '') +
           '</div>';
           if (result.text && result.text.length > 30) {
             bodyHtml += '<div class="cockpit-agent-skill-save"><button class="btn btn-ghost btn-sm" data-save-skill-from-msg>↻ 存为 skill</button></div>';
