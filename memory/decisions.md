@@ -445,3 +445,11 @@
 - **78 E2E + 49 Rust unit = 127 tests passing**.
 - **Roadmap Phase 5 partial**. Full Personal Agent still pending.
 - **180 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.9.x — Skills page landed)
+
+- **Skills management page** — new sidebar item. Browse all skills, create new ones, edit existing, delete via modal. Tag chip bar shows top 6 tags by usage.
+- **DELETE endpoint** added for skill removal.
+- **routeImplFor bug fix** — `skills` was missing from the route impl map (only in `__appRouteImpl`); added to both so hashchange correctly routes to the skills renderContent.
+- **14 nav items total** (was 13). Cockpit now has 1 more section.
+- **186 commits on main** — pushed to origin.
