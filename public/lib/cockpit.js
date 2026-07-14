@@ -20,6 +20,7 @@
     { hash: '#/notes', label: '笔记库', icon: 'note', impl: 'notes' },
     { hash: '#/knowledge', label: '知识图谱', icon: 'graph', impl: 'knowledge' },
     { hash: '#/daily', label: '日记', icon: 'book', impl: 'daily' },
+    { hash: '#/weekly', label: '周报', icon: 'calendar', impl: 'weekly' },
     { hash: '#/tasks', label: '任务', icon: 'check', impl: 'tasks' },
     { hash: '#/schedule', label: '日程', icon: 'calendar', impl: 'schedule' },
     { hash: '#/review', label: '回顾', icon: 'eye', impl: 'review' },
@@ -1735,6 +1736,119 @@
     _graphView = gv;
   }
 
+  // -------------------- Weekly reflection (v0.7) --------------------
+  async function renderWeekly(state) {
+    let weeklies = [];
+    try {
+      const r = await window.__api.api.get('/api/weekly');
+      weeklies = (r && r.weeklies) || [];
+    } catch (e) { console.warn('[weekly] list failed:', e.message); }
+    const today = formatToday();
+    const hero = [
+      '<header class="cockpit-weekly-hero">',
+        icon('calendar', 24),
+        '<div>',
+          '<h1>周报</h1>',
+          '<p>过去 7 天的活动总结 + 模式检测。Local-echo 默认,接 Ollama 时切换。</p>',
+        '</div>',
+      '</header>'
+    ].join('');
+    const statusCards = [
+      '<section class="cockpit-weekly-status">',
+        '<div class="cockpit-weekly-status-card">',
+          '<span class="cockpit-weekly-status-label">Provider</span>',
+          '<span class="cockpit-weekly-status-value">local-echo</span>',
+        '</div>',
+        '<div class="cockpit-weekly-status-card">',
+          '<span class="cockpit-weekly-status-label">Weeklies</span>',
+          '<span class="cockpit-weekly-status-value">' + weeklies.length + '</span>',
+        '</div>',
+      '</section>'
+    ].join('');
+    const actions = [
+      '<section class="cockpit-weekly-actions">',
+        '<button class="btn btn-primary" id="weekly-generate-btn">生成本周周报</button>',
+        '<span class="cockpit-weekly-actions-hint">写入 <code>00-Weekly/YYYY-MM-DD.md</code> · 含 7 天事件 + 陈旧任务</span>',
+      '</section>'
+    ].join('');
+    const list = weeklies.length === 0
+      ? '<div class="cockpit-weekly-empty"><p>没有历史周报。生成第一篇吧。</p></div>'
+      : '<div class="cockpit-weekly-list">' + weeklies.map(j =>
+          '<a class="cockpit-weekly-list-item" href="#" data-weekly-date="' + esc(j.date) + '">' +
+            '<span class="cockpit-weekly-list-date">' + esc(j.date) + '</span>' +
+            '<span class="cockpit-weekly-list-arrow">→</span>' +
+          '</a>'
+        ).join('') + '</div>';
+    const view = [
+      '<section class="cockpit-weekly-view" id="weekly-view" style="display:none">',
+        '<h2 id="weekly-view-title"></h2>',
+        '<pre class="cockpit-weekly-view-content" id="weekly-view-content"></pre>',
+      '</section>'
+    ].join('');
+    return ['<div class="cockpit-weekly">', hero, statusCards, actions, list, view, '</div>'].join('');
+  }
+
+  function bindWeeklyActions(content) {
+    const btn = content.querySelector('#weekly-generate-btn');
+    if (btn) btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '生成中…';
+      try {
+        const r = await window.__api.api.post('/api/weekly', {});
+        if (r && r.ok) {
+          toast('周报已写入 ' + r.path, 'success');
+          const view = content.querySelector('#weekly-view');
+          const title = content.querySelector('#weekly-view-title');
+          const body = content.querySelector('#weekly-view-content');
+          view.style.display = 'block';
+          title.textContent = r.date + ' 周报';
+          body.textContent = r.content;
+          view.scrollIntoView({ behavior: 'smooth' });
+          // Reload to update list
+          setTimeout(() => {
+            const hash = location.hash;
+            location.hash = '';
+            setTimeout(() => { location.hash = hash; }, 50);
+          }, 500);
+        } else {
+          toast('生成失败', 'error');
+        }
+      } catch (e) {
+        toast('生成失败:' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '生成本周周报';
+      }
+    });
+    // Click historical weekly to view
+    content.querySelectorAll('[data-weekly-date]').forEach(a => {
+      a.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const date = a.getAttribute('data-weekly-date');
+        const view = content.querySelector('#weekly-view');
+        const title = content.querySelector('#weekly-view-title');
+        const body = content.querySelector('#weekly-view-content');
+        title.textContent = '加载中…';
+        body.textContent = '';
+        view.style.display = 'block';
+        try {
+          const r = await window.__api.api.get('/api/weekly/' + date);
+          if (r && r.content) {
+            title.textContent = r.date + ' 周报';
+            body.textContent = r.content;
+          } else {
+            title.textContent = date + ' (未找到)';
+            body.textContent = '';
+          }
+        } catch (e) {
+          title.textContent = '加载失败';
+          body.textContent = e.message;
+        }
+        view.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  }
+
   // -------------------- Daily journal helpers (v0.5) --------------------
   async function renderDaily(state) {
     // Fetch list of recent journals
@@ -2157,6 +2271,11 @@
       if (route === 'daily') {
         content.innerHTML = await renderDaily(state);
         bindDailyActions(content);
+        return;
+      }
+      if (route === 'weekly') {
+        content.innerHTML = await renderWeekly(state);
+        bindWeeklyActions(content);
         return;
       }
       if (route === 'templates') {
