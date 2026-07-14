@@ -1,6 +1,6 @@
 {
   "name": "second-brain",
-  "version": "0.4.0",
+  "version": "0.5.0-alpha",
   "private": true,
   "type": "module",
   "description": "Personal Cognitive OS \u2014 local-first Obsidian-backed second brain with Tauri shell, AI daily memory, and MCP agent interface",

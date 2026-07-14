@@ -11,12 +11,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Drag-and-drop for kanban
 - Browser extension for one-click web clipping
 - PDF preview
-- SQLite FTS5 for full-text search at scale
 - Theme system (custom palette + fonts)
 - v0.4.5.x: auto-restart after settings change
 - v0.4.5.x: inline directory editing (advanced)
 - v0.4.6a-e: perf debt (no-innerHTML, virtualize lists, skeleton states, async FS, debounce wikilink)
 - v0.4.L2.x: custom domain + Schema.org + auto-update landing stats
+
+## [0.5.0] - 2026-07-14
+
+### Added
+- **Event store (v0.5.1)** — JSONL append-only log under `vaultRoot/.events/YYYY-MM-DD.jsonl`. All CRUD handlers emit events (`task.created`/`task.updated`/`task.deleted`/`task.done`/`task.in_progress`/etc., `person.*`, `project.*`, `link.imported`, `daily.generated`, `file.changed`). Status transitions (todo→done) get specific event types.
+- **File system watcher (v0.5.1)** — `fs.watch` based. Detects external changes (Obsidian edits, manual file ops, git pulls) and emits `file.changed` events. Cross-platform (recursive on mac/Windows, per-dir fallback on Linux). 250ms debounce.
+- **Daily journal generator (v0.5.x)** — `lib/daily.mjs` summarises events, sends to LLM provider, writes `00-Daily/YYYY-MM-DD.md` to vault. Atomic write. Frontmatter includes provider name + model.
+- **LLM provider wiring (v0.5.x)** — proper OpenAI-compatible provider (`lib/llm/openai.mjs`). Works with OpenAI, Ollama (`/v1`), LM Studio. Reads `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` from env. Falls back to `LocalEchoProvider` when no API key set.
+- **Cockpit 日记 section** — new sidebar item. Status cards (provider / events today / journals total) + generate button + 7-day timeline + viewer.
+- **Daily timeline (v0.5.4)** — 7-day grid showing which days have generated journals. Today/yesterday/N天前 labels + accent highlight on has-journal days.
+
+### Improved
+- OpenAI provider stub (was throwing "not yet implemented") replaced with real implementation.
+- Local-echo daily fallback produces structured markdown from event types.
+- File paths in daily journal `## 文件变化` section make external edits visible.
+
+### API endpoints
+- `GET /api/events?days=N` — list recent events
+- `GET /api/daily` — list recent journals
+- `POST /api/daily { days, date }` — generate today's journal
+- `GET /api/daily/YYYY-MM-DD` — read a specific journal
+
+### Test coverage
+- 45 E2E tests pass (was 41 before v0.5.4)
+- 49 Rust unit tests pass 5/5 (unchanged)
+- Standard v3 mode + cockpit mode regression passes
 
 ## [0.4.0] - 2026-07-13
 
