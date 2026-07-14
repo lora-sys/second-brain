@@ -184,6 +184,7 @@ async (page) => {
 
   // ---- 日记 (v0.5) ----
   await page.goto(BASE + '/?cockpit=1#/daily');
+  await page.waitForSelector('.cockpit-daily', { timeout: 5000 }).catch(() => {});
   await page.waitForTimeout(1500);
   await t('daily: page renders', async () => {
     const has = await page.evaluate(() => !!document.querySelector('.cockpit-daily'));
@@ -229,6 +230,18 @@ async (page) => {
       return d && Array.isArray(d.journals) ? d.journals.length : -1;
     });
     if (n < 0) throw new Error('daily endpoint did not return journals array');
+  });
+  // Re-navigate to fresh daily page to ensure timeline renders
+  await page.goto(BASE + '/?cockpit=1#/daily');
+  await page.waitForTimeout(2500);
+  await t('daily: timeline has 7 day cells', async () => {
+    await page.waitForSelector('.cockpit-daily-timeline-day', { timeout: 3000 });
+    const n = await page.evaluate(() => document.querySelectorAll('.cockpit-daily-timeline-day').length);
+    if (n !== 7) throw new Error('expected 7 timeline cells, got ' + n);
+  });
+  await t('daily: timeline day with journal has-journal class', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.cockpit-daily-timeline-day.has-journal'));
+    if (!has) throw new Error('no has-journal cell');
   });
   await t('cockpit: NO soon badges remain anywhere in sidebar', async () => {
     const soonItems = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-nav-item.is-soon')).map(el => el.textContent.trim()));
@@ -280,6 +293,18 @@ async (page) => {
     const agEntry = labels.find(l => l.text.includes('智能体'));
     if (!agEntry) throw new Error('no 智能体 nav item');
     if (agEntry.soon) throw new Error('BUG: 智能体 still shows soon badge but renderAgent exists');
+  });
+  // Re-navigate to fresh daily page to ensure timeline renders
+  await page.goto(BASE + '/?cockpit=1#/daily');
+  await page.waitForTimeout(2500);
+  await t('daily: timeline has 7 day cells', async () => {
+    await page.waitForSelector('.cockpit-daily-timeline-day', { timeout: 3000 });
+    const n = await page.evaluate(() => document.querySelectorAll('.cockpit-daily-timeline-day').length);
+    if (n !== 7) throw new Error('expected 7 timeline cells, got ' + n);
+  });
+  await t('daily: timeline day with journal has-journal class', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.cockpit-daily-timeline-day.has-journal'));
+    if (!has) throw new Error('no has-journal cell');
   });
   await t('cockpit: NO soon badges remain anywhere in sidebar', async () => {
     const soonItems = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-nav-item.is-soon')).map(el => el.textContent.trim()));

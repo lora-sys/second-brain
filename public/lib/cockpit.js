@@ -1625,27 +1625,60 @@
         '<span class="cockpit-daily-actions-hint">写入 <code>00-Daily/' + esc(today) + '.md</code></span>',
       '</section>'
     ].join('');
-    const list = otherJournals.length === 0
-      ? '<div class="cockpit-daily-empty"><p>没有历史日记。生成第一篇吧。</p></div>'
-      : '<div class="cockpit-daily-list">' + otherJournals.map(j =>
-          '<a class="cockpit-daily-list-item" href="#" data-daily-date="' + esc(j.date) + '">' +
-            '<span class="cockpit-daily-list-date">' + esc(j.date) + '</span>' +
-            '<span class="cockpit-daily-list-arrow">→</span>' +
-          '</a>'
-        ).join('') + '</div>';
-    const listSection = [
-      '<section class="cockpit-daily-history">',
-        '<h2>历史日记</h2>',
-        list,
+    // Timeline: today + last 7 days
+    const days = [];
+    const d0 = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(d0.getTime() - i * 86400000);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${dd}`;
+      const journal = journals.find(j => j.date === dateStr);
+      const label = i === 0 ? '今天' : i === 1 ? '昨天' : `${i} 天前`;
+      days.push({ date: dateStr, label, journal });
+    }
+    const timelineHtml = [
+      '<section class="cockpit-daily-timeline">',
+        '<h2>最近 7 天</h2>',
+        '<div class="cockpit-daily-timeline-grid">',
+          days.map(d => {
+            const has = !!d.journal;
+            const cls = has ? 'cockpit-daily-timeline-day has-journal' : 'cockpit-daily-timeline-day';
+            return '<div class="' + cls + '" data-daily-date="' + esc(d.date) + '">' +
+              '<div class="cockpit-daily-timeline-label">' + esc(d.label) + '</div>' +
+              '<div class="cockpit-daily-timeline-date">' + esc(d.date) + '</div>' +
+              (has ? '<div class="cockpit-daily-timeline-badge">✓ 已生成</div>' : '<div class="cockpit-daily-timeline-badge empty">无</div>') +
+            '</div>';
+          }).join(''),
+        '</div>',
       '</section>'
     ].join('');
+    const olderJournals = otherJournals.filter(j => {
+      const t = new Date(j.date).getTime();
+      const cutoff = Date.now() - 6 * 86400000;
+      return t < cutoff;
+    });
+    const listSection = olderJournals.length === 0
+      ? ''
+      : '<section class="cockpit-daily-history">' +
+          '<h2>更早的日记</h2>' +
+          '<div class="cockpit-daily-list">' +
+            olderJournals.slice(0, 30).map(j =>
+              '<a class="cockpit-daily-list-item" href="#" data-daily-date="' + esc(j.date) + '">' +
+                '<span class="cockpit-daily-list-date">' + esc(j.date) + '</span>' +
+                '<span class="cockpit-daily-list-arrow">→</span>' +
+              '</a>'
+            ).join('') +
+          '</div>' +
+        '</section>';
     const view = [
       '<section class="cockpit-daily-view" id="daily-view" style="display:none">',
         '<h2 id="daily-view-title"></h2>',
         '<pre class="cockpit-daily-view-content" id="daily-view-content"></pre>',
       '</section>'
     ].join('');
-    return ['<div class="cockpit-daily">', hero, statusCards, actions, listSection, view, '</div>'].join('');
+    return ['<div class="cockpit-daily">', hero, statusCards, actions, timelineHtml, listSection, view, '</div>'].join('');
   }
 
   function formatToday() {
@@ -1683,7 +1716,7 @@
         btn.textContent = '生成今天的日记';
       }
     });
-    // Click historical journal to view
+    // Click any day with a journal to view
     content.querySelectorAll('[data-daily-date]').forEach(a => {
       a.addEventListener('click', async (ev) => {
         ev.preventDefault();
