@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.6.x: canvas graph minimap, fit-to-view, edge text labels
 - v0.7: reflection agent, decision journal
 
+## [0.7.0] - 2026-07-14
+
+### Added
+- **Weekly reflection** (v0.7) — new 周报 cockpit section. Scans 7 days of events + stale tasks, writes to `00-Weekly/YYYY-MM-DD.md`.
+- 6 sections per weekly: 本周焦点 / 完成的事 / 进展中的事 / 被忽略的信号 / 陈旧任务 / 下周看什么.
+- Stale task detection — finds open tasks not updated in 7+ days.
+- New endpoints: `GET /api/weekly`, `POST /api/weekly`, `GET /api/weekly/:date`.
+
+### Test coverage
+- 64 E2E tests pass (was 56 before v0.7)
+- 49 Rust unit tests pass 5/5
+
 ## [0.6.0] - 2026-07-14
 
 ### Added

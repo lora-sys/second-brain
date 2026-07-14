@@ -1,6 +1,6 @@
 [package]
 name = "second-brain"
-version = "0.6.0-alpha"
+version = "0.7.0-alpha"
 description = "Second Brain OS — local-first Personal Cognitive Operating System"
 authors = ["lora"]
 license = "MIT"
