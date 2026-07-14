@@ -381,3 +381,16 @@
 - Hit-testing math correctly applies inverse pan/zoom so click/drag still work after zooming
 - 56/56 E2E pass throughout
 - 158 commits on main — pushed to origin
+
+## 2026-07-14 (v0.6.0-alpha released)
+
+- **v0.6.0-alpha tagged and pushed** — Knowledge Graph v2 (Phase 3 of roadmap).
+- **Major features**:
+  - Backlinks panel on every entity detail page (引用了 / 被引用)
+  - Weighted search with title/tag/body scoring + recency boost
+  - Canvas force-directed graph view in 知识图谱 (no deps, pure JS)
+  - Canvas zoom (mouse wheel) + pan (click-drag) + edge highlight markers
+  - Daily timeline auto-refresh after generation
+  - Agent conversation persistence in localStorage
+- **56 E2E + 49 Rust unit = 105 tests passing**.
+- **160 commits on main** — all pushed to origin.
