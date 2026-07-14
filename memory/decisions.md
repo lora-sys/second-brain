@@ -357,3 +357,11 @@
 - **v0.6.2 — Agent conversation persistence** in localStorage. Key `sb-agent-history-v1`. "清空历史" button for explicit reset.
 - **52/52 E2E pass** throughout. No regressions.
 - **148 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.5.0 FINAL released)
+
+- **v0.5.0 tagged and pushed** — replaces v0.5.0-alpha. Full release.
+- **Major features**: event stream, FS watcher, daily journal generator (LocalEcho + OpenAI-compatible), agent tool-use (create_task/mark_done), backlinks panel on every entity detail page, daily timeline UI with auto-refresh, agent conversation persistence in localStorage.
+- **52 E2E tests + 49 Rust unit tests = 101 tests passing**.
+- **GitHub Actions will produce** .deb + AppImage + .rpm + raw binary + draft release.
+- **150 commits on main** — all pushed to origin.
