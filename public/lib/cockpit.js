@@ -27,7 +27,7 @@
     { hash: '#/resources', label: '资源库', icon: 'folder', impl: 'links' },
     { hash: '#/templates', label: '模板', icon: 'copy', impl: 'templates' },
     { hash: '#/tags', label: '标签', icon: 'tag', impl: 'tags' },
-    { hash: '#/agent', label: '智能体', icon: 'sparkle', impl: 'soon' },
+    { hash: '#/agent', label: '智能体', icon: 'sparkle', impl: 'agent' },
     { hash: '#/settings', label: '设置', icon: 'settings', impl: 'settings' },
   ];
 
@@ -1003,7 +1003,208 @@
       + '</div>';
   }
 
-  // -------------------- Templates (v0.4.c6.模板) --------------------
+  // -------------------- Agent (v0.4.c6.智能体) --------------------
+  // Local-echo agent stub. Shows the structure of the agent (provider, model,
+  // status) and gives users a feel for what it does. The actual LLM
+  // integration lands in v0.5 (per the roadmap). For now, the agent answers
+  // with deterministic, keyword-matched responses derived from the vault state.
+  const AGENT_QUICK_PROMPTS = [
+    { id: 'summary',  label: '总结最近的活动', prompt: '总结我最近一周的活动' },
+    { id: 'tasks',    label: '我有哪些未完成任务?', prompt: '我有哪些 open 状态的任务?' },
+    { id: 'people',   label: '我的朋友列表', prompt: '列出我标记为 friend 的人' },
+    { id: 'tags',     label: '最常用的标签', prompt: '我用了哪些标签?最常用的是?' },
+    { id: 'projects', label: '活跃的项目', prompt: '我现在有哪些 active 状态的项目?' },
+  ];
+
+  // Local-echo provider: deterministic, keyword-matched.
+  function agentComplete(prompt, state) {
+    const t0 = Date.now();
+    const p = (prompt || '').toLowerCase();
+    const e = (state && state.entities) || {};
+    const flat = [];
+    for (const type of ['person', 'task', 'project', 'link']) {
+      for (const item of (e[type] || [])) flat.push({ ...item, _type: type });
+    }
+    let text = '';
+    if (/总结|最近|一周|过去/.test(prompt)) {
+      // Count recent updates (last 7 days)
+      const now = Date.now();
+      const dayMs = 86400000;
+      const horizon = now - 7 * dayMs;
+      const recent = flat.filter(it => {
+        const u = (it.data && it.data.updated) || '';
+        if (!u) return false;
+        const t = new Date(u).getTime();
+        return !isNaN(t) && t >= horizon;
+      });
+      const byType = { person: 0, task: 0, project: 0, link: 0 };
+      recent.forEach(it => byType[it._type]++);
+      text = `过去 7 天有 ${recent.length} 次更新:` +
+        ` 任务 ${byType.task}, 项目 ${byType.project}, 链接 ${byType.link}, 人物 ${byType.person}。` +
+        (recent.length > 0
+          ? '最近一条:' + ((recent.sort((a, b) => ((b.data && b.data.updated) || '').localeCompare((a.data && a.data.updated) || ''))[0].data && recent.sort((a, b) => ((b.data && b.data.updated) || '').localeCompare((a.data && a.data.updated) || ''))[0].data.title) || recent.sort((a, b) => ((b.data && b.data.updated) || '').localeCompare((a.data && a.data.updated) || ''))[0].slug)
+          : '');
+    } else if (/任务|未完成|open|todo/.test(prompt)) {
+      const tasks = (e.task || []).filter(t => (t.data && (t.data.status === 'open' || !t.data.status)));
+      text = tasks.length === 0
+        ? '没有未完成任务。🎉'
+        : `有 ${tasks.length} 个未完成任务:` + tasks.slice(0, 5).map(t => '\n• ' + ((t.data && t.data.title) || t.slug)).join('') +
+          (tasks.length > 5 ? `\n(+ ${tasks.length - 5} 更多)` : '');
+    } else if (/朋友|friend|人物/.test(prompt)) {
+      const people = (e.person || []).filter(t => (t.data && t.data.tags && t.data.tags.includes('friend')));
+      text = people.length === 0
+        ? '还没标记任何 friend。'
+        : `有 ${people.length} 个朋友:` + people.map(p => '\n• ' + ((p.data && p.data.title) || p.slug)).join('');
+    } else if (/标签|tags?/.test(prompt)) {
+      const tagCounts = {};
+      for (const it of flat) for (const tag of (it.data && it.data.tags) || []) tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+      const top = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+      text = top.length === 0
+        ? '没有标签。'
+        : `用了 ${Object.keys(tagCounts).length} 个标签,前 ${top.length}:` + top.map(([t, n]) => `\n• #${t} · ${n}`).join('');
+    } else if (/项目|活跃|active/.test(prompt)) {
+      const projects = (e.project || []).filter(p => (p.data && (p.data.status === 'active' || !p.data.status)));
+      text = projects.length === 0
+        ? '没有 active 项目。'
+        : `有 ${projects.length} 个项目:` + projects.map(p => '\n• ' + ((p.data && p.data.title) || p.slug)).join('');
+    } else if (/hello|hi|你好/.test(prompt)) {
+      text = '你好!我是 Second Brain 的本地智能体(目前是 local-echo 模式)。试试上面的快捷问题,或者随便问我点啥。';
+    } else {
+      // Default: count summary
+      text = `[local-echo] 你的 vault 现在有 ${(e.person || []).length} 个人物、` +
+        `${(e.task || []).length} 个任务、${(e.project || []).length} 个项目、` +
+        `${(e.link || []).length} 个链接。试试问「总结最近的活动」或「我有哪些未完成任务」。`;
+    }
+    return {
+      text,
+      durationMs: Date.now() - t0,
+      model: 'local-echo-deterministic-stub',
+      provider: 'local-echo',
+    };
+  }
+
+  function renderAgent(state) {
+    const quickPromptsHtml = AGENT_QUICK_PROMPTS.map(p =>
+      '<button class="cockpit-agent-quick-btn" data-agent-prompt="' + esc(p.prompt) + '">' + esc(p.label) + '</button>'
+    ).join('');
+    const hero = [
+      '<header class="cockpit-agent-hero">',
+        icon('sparkle', 24),
+        '<div>',
+          '<h1>智能体</h1>',
+          '<p>本地-echo 模式,无需 API key。v0.5 会接 Ollama / OpenAI。</p>',
+        '</div>',
+      '</header>'
+    ].join('');
+    const status = [
+      '<section class="cockpit-agent-status">',
+        '<div class="cockpit-agent-status-card">',
+          '<span class="cockpit-agent-status-label">Provider</span>',
+          '<span class="cockpit-agent-status-value">local-echo</span>',
+        '</div>',
+        '<div class="cockpit-agent-status-card">',
+          '<span class="cockpit-agent-status-label">Model</span>',
+          '<span class="cockpit-agent-status-value">deterministic-stub</span>',
+        '</div>',
+        '<div class="cockpit-agent-status-card">',
+          '<span class="cockpit-agent-status-label">Status</span>',
+          '<span class="cockpit-agent-status-value cockpit-agent-status-online">● 在线</span>',
+        '</div>',
+        '<div class="cockpit-agent-status-card">',
+          '<span class="cockpit-agent-status-label">隐私</span>',
+          '<span class="cockpit-agent-status-value">本地运行 · 数据不出本机</span>',
+        '</div>',
+      '</section>'
+    ].join('');
+    const conversation = [
+      '<section class="cockpit-agent-conversation" id="agent-conversation">',
+        '<div class="cockpit-agent-empty">',
+          icon('sparkle', 28),
+          '<h2>开始对话</h2>',
+          '<p>试试快捷问题,或者直接在下面输入想问的。</p>',
+        '</div>',
+      '</section>'
+    ].join('');
+    const composer = [
+      '<section class="cockpit-agent-composer">',
+        '<textarea id="agent-input" placeholder="问点什么 — 比如『总结最近的活动』『我的朋友』" rows="2"></textarea>',
+        '<div class="cockpit-agent-composer-actions">',
+          '<div class="cockpit-agent-quick-prompts">' + quickPromptsHtml + '</div>',
+          '<button class="btn btn-primary" id="agent-send">发送</button>',
+        '</div>',
+      '</section>'
+    ].join('');
+    return [
+      '<div class="cockpit-agent">',
+        hero,
+        status,
+        conversation,
+        composer,
+      '</div>'
+    ].join('');
+  }
+
+  function bindAgentActions(content, state) {
+    const input = content.querySelector('#agent-input');
+    const sendBtn = content.querySelector('#agent-send');
+    const conversation = content.querySelector('#agent-conversation');
+    const send = (text) => {
+      if (!text || !text.trim()) return;
+      // Render user message
+      const userMsg = [
+        '<div class="cockpit-agent-msg cockpit-agent-msg-user">',
+          '<div class="cockpit-agent-msg-label">你</div>',
+          '<div class="cockpit-agent-msg-body">' + esc(text) + '</div>',
+        '</div>'
+      ].join('');
+      const thinkingId = 'agent-thinking-' + Date.now();
+      const thinking = [
+        '<div class="cockpit-agent-msg cockpit-agent-msg-assistant" id="' + thinkingId + '">',
+          '<div class="cockpit-agent-msg-label">智能体</div>',
+          '<div class="cockpit-agent-msg-body"><span class="cockpit-agent-thinking">思考中…</span></div>',
+        '</div>'
+      ].join('');
+      // Clear empty state if present
+      const emptyEl = conversation.querySelector('.cockpit-agent-empty');
+      if (emptyEl) emptyEl.remove();
+      conversation.insertAdjacentHTML('beforeend', userMsg + thinking);
+      conversation.scrollTop = conversation.scrollHeight;
+      // Process after a tiny delay so the thinking state is visible
+      setTimeout(() => {
+        const result = agentComplete(text, state);
+        const msgEl = document.getElementById(thinkingId);
+        if (msgEl) {
+          msgEl.querySelector('.cockpit-agent-msg-body').innerHTML =
+            '<pre class="cockpit-agent-response-text">' + esc(result.text) + '</pre>' +
+            '<div class="cockpit-agent-response-meta">' +
+              esc(result.provider) + ' · ' + esc(result.model) + ' · ' + result.durationMs + 'ms' +
+            '</div>';
+        }
+        conversation.scrollTop = conversation.scrollHeight;
+      }, 200);
+    };
+    sendBtn.addEventListener('click', () => {
+      send(input.value);
+      input.value = '';
+    });
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+        ev.preventDefault();
+        send(input.value);
+        input.value = '';
+      }
+    });
+    content.querySelectorAll('[data-agent-prompt]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const prompt = btn.getAttribute('data-agent-prompt');
+        input.value = prompt;
+        send(prompt);
+        input.value = '';
+      });
+    });
+  }
+
+    // -------------------- Templates (v0.4.c6.模板) --------------------
   // Pre-defined starter templates per entity type. Each template pre-fills
   // the body + tags when the user picks it from the cockpit Templates page
   // or from the quick-add flow. Templates live in JS, not in the vault,
@@ -1596,6 +1797,11 @@
       if (route === 'templates') {
         content.innerHTML = renderTemplates(state);
         bindTemplateActions(content);
+        return;
+      }
+      if (route === 'agent') {
+        content.innerHTML = renderAgent(state);
+        bindAgentActions(content, state);
         return;
       }
       const map = [].concat(NAV_PRIMARY, NAV_RESOURCES).reduce((m, it) => (m[it.impl] = it.label, m), {});

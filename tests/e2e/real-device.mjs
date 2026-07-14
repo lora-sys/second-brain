@@ -182,6 +182,57 @@ async (page) => {
     if (tplEntry.soon) throw new Error('BUG: 模板 still shows soon badge but renderTemplates exists');
   });
 
+  // ---- 智能体 ----
+  await page.goto(BASE + '/?cockpit=1#/agent');
+  await page.waitForTimeout(1500);
+  await t('agent: page renders', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.cockpit-agent'));
+    if (!has) throw new Error('agent page did not render');
+  });
+  await t('agent: status cards show provider/model/status/privacy', async () => {
+    const labels = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-agent-status-label')).map(e => e.textContent));
+    for (const need of ['Provider', 'Model', 'Status', '隐私']) {
+      if (!labels.includes(need)) throw new Error('missing status card: ' + need);
+    }
+  });
+  await t('agent: composer with input + 5 quick prompts', async () => {
+    const input = await page.evaluate(() => !!document.getElementById('agent-input'));
+    if (!input) throw new Error('no composer input');
+    const n = await page.evaluate(() => document.querySelectorAll('.cockpit-agent-quick-btn').length);
+    if (n !== 5) throw new Error('expected 5 quick prompts, got ' + n);
+  });
+  await t('agent: clicking quick prompt produces assistant reply', async () => {
+    // Click the "我有哪些未完成任务?" quick prompt
+    await page.evaluate(() => {
+      const btns = document.querySelectorAll('.cockpit-agent-quick-btn');
+      // The 2nd button is tasks
+      btns[1].click();
+    });
+    await page.waitForTimeout(500);
+    const msgs = await page.evaluate(() => document.querySelectorAll('.cockpit-agent-msg').length);
+    if (msgs < 2) throw new Error('expected at least 2 messages (user + assistant), got ' + msgs);
+    const assistantText = await page.evaluate(() => {
+      const el = document.querySelector('.cockpit-agent-msg-assistant .cockpit-agent-response-text');
+      return el ? el.textContent : '';
+    });
+    if (!assistantText || assistantText.length === 0) throw new Error('no assistant text');
+  });
+  await t('cockpit: 智能体 nav does NOT have soon badge', async () => {
+    const labels = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('.cockpit-nav-item')).map(el => ({
+        text: el.textContent.trim(),
+        soon: el.classList.contains('is-soon'),
+      }));
+    });
+    const agEntry = labels.find(l => l.text.includes('智能体'));
+    if (!agEntry) throw new Error('no 智能体 nav item');
+    if (agEntry.soon) throw new Error('BUG: 智能体 still shows soon badge but renderAgent exists');
+  });
+  await t('cockpit: NO soon badges remain anywhere in sidebar', async () => {
+    const soonItems = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-nav-item.is-soon')).map(el => el.textContent.trim()));
+    if (soonItems.length > 0) throw new Error('still has soon badges: ' + soonItems.join(', '));
+  });
+
   // Bug-hunt: 回顾 sidebar must not show 'soon' badge.
   await page.goto(BASE + '/?cockpit=1');
   await page.waitForTimeout(1500);

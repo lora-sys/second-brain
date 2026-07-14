@@ -1823,6 +1823,7 @@
     if (route === 'review') return 'review';
     if (route === 'knowledge') return 'knowledge';
     if (route === 'templates') return 'templates';
+    if (route === 'agent') return 'agent';
     if (route === 'settings') return 'settings';
     if (route === 'review') return 'review';
     if (route === 'schedule') return 'schedule';
@@ -1839,6 +1840,7 @@
     if (route === 'review') return 'review';
     if (route === 'knowledge') return 'knowledge';
     if (route === 'templates') return 'templates';
+    if (route === 'agent') return 'agent';
     if (route === 'settings') return 'settings';
     if (route === 'schedule') return 'schedule';
     if (route === 'notes') return 'notes';
