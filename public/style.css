@@ -3982,3 +3982,30 @@ body.cockpit-mode .app { display: none !important; }
   font-size: 10px;
   font-family: var(--font-mono);
 }
+
+/* ============================================================================
+ * v0.12 — Latest Reflection widget (dashboard)
+ * Shows the latest weekly journal excerpt inline.
+ * ========================================================================== */
+.cockpit-today-block.block-insight {
+  background: var(--surface-1);
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  padding: 14px 16px;
+  margin-top: 14px;
+}
+.cockpit-insight-preview {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow: auto;
+  margin-bottom: 0;
+}
