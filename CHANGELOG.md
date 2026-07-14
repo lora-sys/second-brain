@@ -16,6 +16,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.4.5.x: inline directory editing (advanced)
 - v0.4.6a-e: perf debt (no-innerHTML, virtualize lists, skeleton states, async FS, debounce wikilink)
 - v0.4.L2.x: custom domain + Schema.org + auto-update landing stats
+- v0.6.x: canvas graph minimap, fit-to-view, edge text labels
+- v0.7: reflection agent, decision journal
+
+## [0.6.0] - 2026-07-14
+
+### Added
+- **v0.6 — Knowledge Graph v2** (Phase 3 of roadmap)
+  - **Backlinks panel** on every entity detail page (引用了 / 被引用 two-column layout)
+  - Resolution matches id, type/slug, slug, or title — handles all wikilink styles
+  - 30s cached bodies via `_fullEntitiesCache`
+  - **Weighted search** (v0.6.3) — title=100/30, tag=25/10, body=5/match, recency boost +0-10
+  - **Canvas force-directed graph view** (v0.6.4) — toggle in 知识图谱. Pure vanilla JS, no deps.
+  - **Canvas zoom + pan** (v0.6.5) — mouse wheel + click-drag. Edge highlight markers on hover.
+- **v0.6.1 — Daily timeline auto-refresh** after generation
+- **v0.6.2 — Agent conversation persistence** in localStorage (`sb-agent-history-v1`)
+
+### Improved
+- Knowledge graph view now has tabbed UI: 列表 (hubs) / 关系图 (canvas)
+- Search results show score badges + total count
+
+### Test coverage
+- 56 E2E tests pass (was 52 before v0.6 rounds)
+- 49 Rust unit tests pass 5/5 (unchanged)
+- Standard v3 mode + cockpit mode regression passes
 
 ## [0.5.0] - 2026-07-14
 
