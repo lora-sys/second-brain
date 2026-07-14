@@ -330,3 +330,12 @@
   - Daily uses LocalEcho by default (no LLM needed)
   - OPENAI_API_KEY enables cloud LLM (opt-in)
 - **134 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.5.5 agent tool-use landed)
+
+- **Tool-use shipped** — local-echo agent can now perform actions (create_task, mark_done) instead of just answering questions. Pattern: agentComplete returns {text, actions}, bindAgentActions executes them via api.create/api.update, shows results inline.
+- **2 new quick prompts** — "新建任务: ..." (extracts title from prompt) + "把最新任务标完成" (finds most recent open task).
+- **Inline action results** — green ✓ rows show action type + result message. State.entities refreshes after mutations.
+- **46/46 E2E pass** — 1 new test for create_task action execution.
+- **Pattern**: this is the bridge from read-only agent to read-write agent. Real LLM (when wired) can emit actions via system prompt → same executeActions handler.
+- **138 commits on main** — pushed to origin.
