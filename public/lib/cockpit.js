@@ -1010,14 +1010,18 @@
   // integration lands in v0.5 (per the roadmap). For now, the agent answers
   // with deterministic, keyword-matched responses derived from the vault state.
   const AGENT_QUICK_PROMPTS = [
-    { id: 'summary',  label: '总结最近的活动', prompt: '总结我最近一周的活动' },
-    { id: 'tasks',    label: '我有哪些未完成任务?', prompt: '我有哪些 open 状态的任务?' },
-    { id: 'people',   label: '我的朋友列表', prompt: '列出我标记为 friend 的人' },
-    { id: 'tags',     label: '最常用的标签', prompt: '我用了哪些标签?最常用的是?' },
-    { id: 'projects', label: '活跃的项目', prompt: '我现在有哪些 active 状态的项目?' },
+    { id: 'summary',   label: '总结最近的活动', prompt: '总结我最近一周的活动' },
+    { id: 'tasks',     label: '我有哪些未完成任务?', prompt: '我有哪些 open 状态的任务?' },
+    { id: 'people',    label: '我的朋友列表', prompt: '列出我标记为 friend 的人' },
+    { id: 'tags',      label: '最常用的标签', prompt: '我用了哪些标签?最常用的是?' },
+    { id: 'projects',  label: '活跃的项目', prompt: '我现在有哪些 active 状态的项目?' },
+    { id: 'create-task', label: '新建任务: ...', prompt: '帮我新建一个任务: 写 v0.5 release notes', tool: true },
+    { id: 'mark-done', label: '把最新任务标完成', prompt: '把最新的 open 任务标成 done', tool: true },
   ];
 
   // Local-echo provider: deterministic, keyword-matched.
+  // Supports [ACTION:type:arg=value] directives in prompts. When detected,
+  // the agent generates the corresponding action alongside the response.
   function agentComplete(prompt, state) {
     const t0 = Date.now();
     const p = (prompt || '').toLowerCase();
@@ -1025,6 +1029,28 @@
     const flat = [];
     for (const type of ['person', 'task', 'project', 'link']) {
       for (const item of (e[type] || [])) flat.push({ ...item, _type: type });
+    }
+    // Detect intent for actions
+    const actions = [];
+    if (/新建.*任务|帮我.*任务|create.*task/i.test(prompt)) {
+      // Extract title: text after "任务:" or "任务：" or "new task"
+      let title = '';
+      const m = prompt.match(/(?:任务[:：])\s*(.+)/i);
+      if (m) title = m[1].trim();
+      else if (/create.*task[:：]?\s*(.+)/i.test(prompt)) {
+        const m2 = prompt.match(/(?:create.*task[:：]?)\s*(.+)/i);
+        if (m2) title = m2[1].trim();
+      }
+      if (title) actions.push({ type: 'create_task', payload: { type: 'task', title } });
+    } else if (/标完成|标.*done|完成.*任务/i.test(prompt)) {
+      // Find the most recent open task
+      const tasks = (e.task || []).filter(t => (t.data && (t.data.status === 'open' || !t.data.status)));
+      if (tasks.length > 0) {
+        // Sort by updated desc
+        tasks.sort((a, b) => ((b.data && b.data.updated) || '').localeCompare((a.data && a.data.updated) || ''));
+        const latest = tasks[0];
+        actions.push({ type: 'mark_done', payload: { id: latest.id, slug: latest.slug, title: (latest.data && latest.data.title) || latest.slug } });
+      }
     }
     let text = '';
     if (/总结|最近|一周|过去/.test(prompt)) {
@@ -1081,6 +1107,7 @@
       durationMs: Date.now() - t0,
       model: 'local-echo-deterministic-stub',
       provider: 'local-echo',
+      actions,
     };
   }
 
@@ -1171,15 +1198,20 @@
       conversation.insertAdjacentHTML('beforeend', userMsg + thinking);
       conversation.scrollTop = conversation.scrollHeight;
       // Process after a tiny delay so the thinking state is visible
-      setTimeout(() => {
+      setTimeout(async () => {
         const result = agentComplete(text, state);
         const msgEl = document.getElementById(thinkingId);
         if (msgEl) {
-          msgEl.querySelector('.cockpit-agent-msg-body').innerHTML =
-            '<pre class="cockpit-agent-response-text">' + esc(result.text) + '</pre>' +
-            '<div class="cockpit-agent-response-meta">' +
-              esc(result.provider) + ' · ' + esc(result.model) + ' · ' + result.durationMs + 'ms' +
-            '</div>';
+          let bodyHtml = '<pre class="cockpit-agent-response-text">' + esc(result.text) + '</pre>';
+          // Execute actions and append results
+          if (result.actions && result.actions.length > 0) {
+            const actionResults = await executeActions(result.actions, state);
+            bodyHtml += renderActionsHtml(result.actions, actionResults);
+          }
+          bodyHtml += '<div class="cockpit-agent-response-meta">' +
+            esc(result.provider) + ' · ' + esc(result.model) + ' · ' + result.durationMs + 'ms' +
+          '</div>';
+          msgEl.querySelector('.cockpit-agent-msg-body').innerHTML = bodyHtml;
         }
         conversation.scrollTop = conversation.scrollHeight;
       }, 200);
@@ -1203,6 +1235,60 @@
         input.value = '';
       });
     });
+  }
+
+  // Execute actions emitted by the agent (tool-use).
+  // Returns array of {action, ok, message} for rendering.
+  async function executeActions(actions, state) {
+    const results = [];
+    for (const a of actions) {
+      try {
+        if (a.type === 'create_task' || a.type === 'create_person' || a.type === 'create_project' || a.type === 'create_link') {
+          const created = await window.__api.api.create(a.payload);
+          results.push({ action: a, ok: true, message: '已创建:' + ((created.data && created.data.title) || a.payload.title), ref: created });
+        } else if (a.type === 'mark_done') {
+          const updated = await window.__api.api.update(a.payload.id, { data: { status: 'done' } });
+          results.push({ action: a, ok: true, message: '已标完成:' + a.payload.title, ref: updated });
+        } else if (a.type === 'update_tags') {
+          const updated = await window.__api.api.update(a.payload.id, { data: { tags: a.payload.tags } });
+          results.push({ action: a, ok: true, message: '已更新标签', ref: updated });
+        } else {
+          results.push({ action: a, ok: false, message: '未知 action:' + a.type });
+        }
+        // Refresh state.entities after mutation
+        if (window.__state && window.__state.state) {
+          try {
+            const items = await window.__api.api.list();
+            const buckets = { person: [], task: [], project: [], link: [] };
+            for (const it of items) (buckets[it.type] || buckets.link).push(it);
+            window.__state.state.entities = buckets;
+            state.entities = buckets;
+          } catch (e) { /* ignore */ }
+        }
+      } catch (err) {
+        results.push({ action: a, ok: false, message: err.message });
+      }
+    }
+    return results;
+  }
+
+  // Render action results inline in the agent's response.
+  function renderActionsHtml(actions, results) {
+    if (!actions || actions.length === 0) return '';
+    const items = actions.map((a, i) => {
+      const r = results[i];
+      const icon = r.ok ? '✓' : '✗';
+      const cls = r.ok ? 'cockpit-agent-action-ok' : 'cockpit-agent-action-fail';
+      return '<div class="cockpit-agent-action ' + cls + '">' +
+        '<span class="cockpit-agent-action-icon">' + icon + '</span>' +
+        '<span class="cockpit-agent-action-type">' + esc(a.type) + '</span>' +
+        '<span class="cockpit-agent-action-msg">' + esc(r.message) + '</span>' +
+      '</div>';
+    }).join('');
+    return '<div class="cockpit-agent-actions">' +
+      '<div class="cockpit-agent-actions-label">已执行的操作:</div>' +
+      items +
+    '</div>';
   }
 
     // -------------------- Templates (v0.4.c6.模板) --------------------

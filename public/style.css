@@ -3426,3 +3426,59 @@ body.cockpit-mode .app { display: none !important; }
   white-space: pre-wrap; word-break: break-word;
   max-height: 480px; overflow: auto;
 }
+
+/* ============================================================================
+ * v0.5.5 — Agent Action Results
+ * Inline display of tool-use actions executed by the local-echo agent.
+ * ========================================================================== */
+
+.cockpit-agent-actions {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+.cockpit-agent-actions-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.cockpit-agent-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.cockpit-agent-action-ok {
+  border-left: 3px solid #059669;
+}
+.cockpit-agent-action-fail {
+  border-left: 3px solid #dc2626;
+}
+.cockpit-agent-action-icon {
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.cockpit-agent-action-ok .cockpit-agent-action-icon { color: #059669; }
+.cockpit-agent-action-fail .cockpit-agent-action-icon { color: #dc2626; }
+.cockpit-agent-action-type {
+  font-family: var(--font-mono);
+  background: var(--surface-3);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--text-soft);
+  flex-shrink: 0;
+}
+.cockpit-agent-action-msg {
+  color: var(--text);
+  flex: 1;
+}
