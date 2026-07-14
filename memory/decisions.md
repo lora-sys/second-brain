@@ -495,3 +495,10 @@
 
 - **Weekly reflection now includes 模式与趋势 (vs 上周) + 节奏** — detectTrends() compares this week's summary to last week's frontmatter (eventsCount). Surfaces activity volume change, new event types, disappeared types, plus daily average.
 - **204 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.12 dashboard insight widget)
+
+- **最新周报 (Latest Reflection) widget** — shows the most recent weekly journal's first 5 lines inline on the dashboard. Has a "看完整周报 →" link to view the full journal.
+- **Backend change** — `handleWeeklyList` now reads each weekly's body (first 400 chars) and includes it in the response.
+- **Bug fixed** — initial code had `const journals = []` but tried to reassign after the API call, causing silent failure. Fixed to `let`.
+- **205 commits on main** — pushed to origin.
