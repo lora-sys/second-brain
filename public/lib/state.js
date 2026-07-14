@@ -8,7 +8,7 @@
   const state = {
     config: null,
     counts: { person: 0, task: 0, project: 0, link: 0 },
-    entities: { person: [], task: [], project: [], link: [] },
+    entities: { person: [], task: [], project: [], link: [], decision: [] },
     tasksByStatus: null,
     dueTasks: null,
     recent: null,

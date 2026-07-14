@@ -33,7 +33,7 @@ async (page) => {
   });
   await t('cockpit: 10 nav items', async () => {
     const n = await page.evaluate(() => document.querySelectorAll('.cockpit-nav-item').length);
-    if (n !== 13) throw new Error('expected 13, got ' + n);
+    if (n !== 14) throw new Error('expected 14, got ' + n);
   });
   await t('cockpit: today has 3 blocks', async () => {
     const blocks = await page.evaluate(() => Array.from(document.querySelectorAll('.cockpit-today-block .cockpit-block-title')).map(e => e.textContent));
@@ -265,12 +265,16 @@ async (page) => {
     if (!has) throw new Error('no generate button');
   });
   await t('weekly: clicking generate produces weekly report', async () => {
-    // Use Promise to wait for the post + render before checking state
-    await page.evaluate(() => new Promise(r => {
+    // Wait for the title to be set by polling
+    await page.evaluate(() => {
       document.getElementById('weekly-generate-btn').click();
-      setTimeout(r, 600);
-    }));
-    const title = await page.evaluate(() => document.getElementById('weekly-view-title').textContent);
+    });
+    let title = '';
+    for (let i = 0; i < 20; i++) {
+      await page.waitForTimeout(100);
+      title = await page.evaluate(() => document.getElementById('weekly-view-title').textContent);
+      if (title && title.includes('周报')) break;
+    }
     if (!title.includes('周报')) throw new Error('weekly title not set: ' + title);
   });
   await t('API: /api/weekly list returns weeklies array', async () => {
@@ -280,6 +284,38 @@ async (page) => {
       return d && Array.isArray(d.weeklies) ? d.weeklies.length : -1;
     });
     if (n < 0) throw new Error('weekly endpoint did not return weeklies array');
+  });
+  // ---- 决策 (v0.8) ----
+  await page.goto(BASE + '/?cockpit=1#/decisions');
+  await page.waitForTimeout(1500);
+  await t('decisions: page renders', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.cockpit-decision'));
+    if (!has) throw new Error('decisions page did not render');
+  });
+  await t('decisions: has 4 status cards', async () => {
+    const n = await page.evaluate(() => document.querySelectorAll('.cockpit-decision-status-card').length);
+    if (n !== 4) throw new Error('expected 4 status cards, got ' + n);
+  });
+  await t('decisions: has new-decision button', async () => {
+    const has = await page.evaluate(() => !!document.getElementById('decision-new-btn'));
+    if (!has) throw new Error('no new decision button');
+  });
+  await t('API: POST /api/entities accepts decision type', async () => {
+    const r = await page.evaluate(async () => {
+      const x = await fetch('/api/entities', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type: 'decision',
+          title: 'E2E test decision ' + Date.now(),
+          data: { status: 'pending', context: 'test context' }
+        })
+      });
+      const d = await x.json();
+      return { ok: x.ok, id: d.id, status: d.data && d.data.status };
+    });
+    if (!r.ok) throw new Error('decision creation failed: ' + JSON.stringify(r));
+    if (r.status !== 'pending') throw new Error('decision should default to pending, got: ' + r.status);
   });
   // ---- v0.6 backlinks ----
   await page.goto(BASE + '/?v=' + Date.now() + '#/entity/30-Projects/AI%20Engineering%20Harness');
@@ -394,12 +430,16 @@ async (page) => {
     if (!has) throw new Error('no generate button');
   });
   await t('weekly: clicking generate produces weekly report', async () => {
-    // Use Promise to wait for the post + render before checking state
-    await page.evaluate(() => new Promise(r => {
+    // Wait for the title to be set by polling
+    await page.evaluate(() => {
       document.getElementById('weekly-generate-btn').click();
-      setTimeout(r, 600);
-    }));
-    const title = await page.evaluate(() => document.getElementById('weekly-view-title').textContent);
+    });
+    let title = '';
+    for (let i = 0; i < 20; i++) {
+      await page.waitForTimeout(100);
+      title = await page.evaluate(() => document.getElementById('weekly-view-title').textContent);
+      if (title && title.includes('周报')) break;
+    }
     if (!title.includes('周报')) throw new Error('weekly title not set: ' + title);
   });
   await t('API: /api/weekly list returns weeklies array', async () => {
@@ -409,6 +449,38 @@ async (page) => {
       return d && Array.isArray(d.weeklies) ? d.weeklies.length : -1;
     });
     if (n < 0) throw new Error('weekly endpoint did not return weeklies array');
+  });
+  // ---- 决策 (v0.8) ----
+  await page.goto(BASE + '/?cockpit=1#/decisions');
+  await page.waitForTimeout(1500);
+  await t('decisions: page renders', async () => {
+    const has = await page.evaluate(() => !!document.querySelector('.cockpit-decision'));
+    if (!has) throw new Error('decisions page did not render');
+  });
+  await t('decisions: has 4 status cards', async () => {
+    const n = await page.evaluate(() => document.querySelectorAll('.cockpit-decision-status-card').length);
+    if (n !== 4) throw new Error('expected 4 status cards, got ' + n);
+  });
+  await t('decisions: has new-decision button', async () => {
+    const has = await page.evaluate(() => !!document.getElementById('decision-new-btn'));
+    if (!has) throw new Error('no new decision button');
+  });
+  await t('API: POST /api/entities accepts decision type', async () => {
+    const r = await page.evaluate(async () => {
+      const x = await fetch('/api/entities', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type: 'decision',
+          title: 'E2E test decision ' + Date.now(),
+          data: { status: 'pending', context: 'test context' }
+        })
+      });
+      const d = await x.json();
+      return { ok: x.ok, id: d.id, status: d.data && d.data.status };
+    });
+    if (!r.ok) throw new Error('decision creation failed: ' + JSON.stringify(r));
+    if (r.status !== 'pending') throw new Error('decision should default to pending, got: ' + r.status);
   });
   // ---- v0.6 backlinks ----
   await page.goto(BASE + '/?v=' + Date.now() + '#/entity/30-Projects/AI%20Engineering%20Harness');

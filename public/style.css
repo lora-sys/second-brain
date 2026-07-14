@@ -3633,3 +3633,120 @@ body.cockpit-mode .app { display: none !important; }
   white-space: pre-wrap; word-break: break-word;
   max-height: 480px; overflow: auto;
 }
+
+/* ============================================================================
+ * v0.8 — Decision Journal Section
+ * Cards with status, context preview, retrospective.
+ * ========================================================================== */
+
+.cockpit-decision { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.cockpit-decision-hero {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 18px 22px; background: var(--surface-1);
+  border-radius: 12px; border: 1px solid var(--border-soft);
+}
+.cockpit-decision-hero svg { color: var(--accent-strong); flex-shrink: 0; margin-top: 2px; }
+.cockpit-decision-hero h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+.cockpit-decision-hero p { margin: 0; color: var(--text-soft); font-size: 13px; flex: 1; }
+.cockpit-decision-status {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+.cockpit-decision-status-card {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 14px; background: var(--surface-1);
+  border-radius: 10px; border: 1px solid var(--border-soft);
+}
+.cockpit-decision-status-label {
+  font-size: 11px; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.cockpit-decision-status-value {
+  font-size: 24px; font-weight: 600;
+}
+.cockpit-decision-status-pending { color: #d97706; }
+.cockpit-decision-status-reviewed { color: #059669; }
+
+.cockpit-decision-list {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.cockpit-decision-item {
+  display: block;
+  padding: 14px 16px;
+  background: var(--surface-1);
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid #d97706;
+  text-decoration: none;
+  color: var(--text);
+  transition: background 0.15s;
+}
+.cockpit-decision-item:hover { background: var(--surface-2); }
+.cockpit-decision-item-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 4px;
+}
+.cockpit-decision-item-title { font-size: 14px; font-weight: 600; flex: 1; }
+.cockpit-decision-item-status {
+  font-size: 10px; padding: 2px 8px; border-radius: 8px;
+  font-family: var(--font-mono); font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cockpit-decision-item-status.status-pending {
+  background: rgba(217,119,6,0.1); color: #d97706;
+}
+.cockpit-decision-item-status.status-reviewed {
+  background: rgba(5,150,105,0.1); color: #059669;
+}
+.cockpit-decision-item-context {
+  font-size: 12px; color: var(--text-soft);
+  line-height: 1.5;
+  margin: 4px 0;
+}
+.cockpit-decision-item-retro {
+  font-size: 11px; color: var(--text-faint);
+  font-style: italic;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border-soft);
+}
+.cockpit-decision-empty {
+  padding: 30px 16px; background: var(--surface-1);
+  border-radius: 8px; border: 1px solid var(--border-soft);
+  text-align: center; color: var(--text-soft);
+}
+.dot-decision { background: #d97706; }
+
+/* ============================================================================
+ * v0.8 — Decision Journal polish
+ * Age badge, needs-review state, review button alignment.
+ * ========================================================================== */
+
+.cockpit-decision-item { display: flex; gap: 8px; align-items: center; }
+.cockpit-decision-item-link { flex: 1; }
+.cockpit-decision-item-age {
+  font-size: 10px;
+  padding: 2px 8px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  margin-left: auto;
+  margin-right: 8px;
+}
+.cockpit-decision-item-age.today {
+  background: rgba(124,58,237,0.1);
+  color: var(--accent-strong, #7c3aed);
+}
+.cockpit-decision-item.needs-review {
+  border-left-color: #dc2626;
+  background: rgba(220,38,38,0.04);
+}
+.cockpit-decision-item-needs-review {
+  font-size: 11px;
+  color: #dc2626;
+  font-style: italic;
+  margin-top: 6px;
+  padding: 4px 0;
+}
+.cockpit-decision-status-needs { color: #dc2626; }

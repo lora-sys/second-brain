@@ -30,6 +30,7 @@
     { hash: '#/templates', label: '模板', icon: 'copy', impl: 'templates' },
     { hash: '#/tags', label: '标签', icon: 'tag', impl: 'tags' },
     { hash: '#/agent', label: '智能体', icon: 'sparkle', impl: 'agent' },
+    { hash: '#/decisions', label: '决策', icon: 'check', impl: 'decisions' },
     { hash: '#/settings', label: '设置', icon: 'settings', impl: 'settings' },
   ];
 
@@ -1308,7 +1309,7 @@
         if (window.__state && window.__state.state) {
           try {
             const items = await window.__api.api.list();
-            const buckets = { person: [], task: [], project: [], link: [] };
+            const buckets = { person: [], task: [], project: [], link: [], decision: [] };
             for (const it of items) (buckets[it.type] || buckets.link).push(it);
             window.__state.state.entities = buckets;
             state.entities = buckets;
@@ -1734,6 +1735,193 @@
       location.hash = '#/entity/' + encodeURIComponent(id);
     };
     _graphView = gv;
+  }
+
+  // -------------------- Decision journal (v0.8) --------------------
+  function renderDecisions(state) {
+    const decisions = (state.entities && state.entities.decision) || [];
+    const now = Date.now();
+    const dayMs = 86400000;
+    const enriched = decisions.map(d => {
+      const madeAt = d.data && d.data.madeAt;
+      const daysOld = madeAt ? Math.floor((now - new Date(madeAt).getTime()) / dayMs) : 0;
+      const status = (d.data && d.data.status) || 'pending';
+      const needsReview = status === 'pending' && daysOld >= 30;
+      return Object.assign({}, d, { _daysOld: daysOld, _needsReview: needsReview });
+    });
+    const pending = enriched.filter(d => d.data.status === 'pending');
+    const reviewed = enriched.filter(d => d.data.status === 'reviewed');
+    const needsReview = enriched.filter(d => d._needsReview);
+    const hero = [
+      '<header class="cockpit-decision-hero">',
+        icon('check', 24),
+        '<div>',
+          '<h1>决策</h1>',
+          '<p>记录重要决策 + 事后回顾。3 个月后回看,看到底走对没走对。</p>',
+        '</div>',
+        '<button class="btn btn-primary" id="decision-new-btn">新建决策</button>',
+      '</header>'
+    ].join('');
+    const statusCard = (label, value, extraClass) =>
+      '<div class="cockpit-decision-status-card">' +
+        '<span class="cockpit-decision-status-label">' + esc(label) + '</span>' +
+        '<span class="cockpit-decision-status-value' + (extraClass ? ' ' + extraClass : '') + '">' + value + '</span>' +
+      '</div>';
+    const statusCards = [
+      '<section class="cockpit-decision-status">',
+        statusCard('总数', decisions.length),
+        statusCard('待回顾', pending.length, 'cockpit-decision-status-pending'),
+        statusCard('已回顾', reviewed.length, 'cockpit-decision-status-reviewed'),
+        statusCard('需回顾 (30+ 天)', needsReview.length, needsReview.length > 0 ? 'cockpit-decision-status-needs' : ''),
+      '</section>'
+    ].join('');
+    // Sort by madeAt desc
+    const sorted = decisions.slice().sort((a, b) => {
+      const aT = (a.data && a.data.madeAt) || '';
+      const bT = (b.data && b.data.madeAt) || '';
+      return bT.localeCompare(aT);
+    });
+    const list = enriched.length === 0
+      ? '<div class="cockpit-decision-empty"><p>还没有决策记录。点击右上「新建决策」开始记录。</p></div>'
+      : '<div class="cockpit-decision-list">'
+        + enriched.slice().sort((a, b) => {
+            const aT = (a.data && a.data.madeAt) || '';
+            const bT = (b.data && b.data.madeAt) || '';
+            return bT.localeCompare(aT);
+          }).map(d => {
+          const title = (d.data && (d.data.title || d.data.name)) || d.slug;
+          const status = (d.data && d.data.status) || 'pending';
+          const context = (d.data && d.data.context) || '';
+          const retrospective = (d.data && d.data.retrospective) || '';
+          const itemClass = 'cockpit-decision-item' + (d._needsReview ? ' needs-review' : '');
+          const ageBadge = d._daysOld > 0
+            ? '<span class="cockpit-decision-item-age">' + d._daysOld + ' 天前</span>'
+            : '<span class="cockpit-decision-item-age today">今天</span>';
+          const reviewBtn = (status === 'pending' || d._needsReview)
+            ? '<button class="btn btn-ghost btn-sm" data-review-decision="' + esc(d.id) + '">添加回顾</button>'
+            : '';
+          return '<div class="' + itemClass + '">' +
+            '<a class="cockpit-decision-item-link" href="#/entity/' + esc(d.id) + '">' +
+              '<div class="cockpit-decision-item-header">' +
+                '<span class="cockpit-list-dot dot-decision"></span>' +
+                '<span class="cockpit-decision-item-title">' + esc(title) + '</span>' +
+                ageBadge +
+                '<span class="cockpit-decision-item-status status-' + esc(status) + '">' + esc(status) + '</span>' +
+              '</div>' +
+              (context ? '<div class="cockpit-decision-item-context">' + esc(context.slice(0, 120)) + (context.length > 120 ? '…' : '') + '</div>' : '') +
+              (retrospective ? '<div class="cockpit-decision-item-retro">↻ ' + esc(retrospective.slice(0, 80)) + (retrospective.length > 80 ? '…' : '') + '</div>' : '') +
+              (d._needsReview ? '<div class="cockpit-decision-item-needs-review">⏰ 超过 30 天没回顾,值得看看走对没走对</div>' : '') +
+            '</a>' +
+            reviewBtn +
+          '</div>';
+        }).join('') + '</div>';
+    return ['<div class="cockpit-decision">', hero, statusCards, list, '</div>'].join('');
+  }
+
+  function bindDecisionActions(content, state) {
+    const newBtn = content.querySelector('#decision-new-btn');
+    if (newBtn) {
+      newBtn.addEventListener('click', () => openDecisionModal());
+    }
+    content.querySelectorAll('[data-review-decision]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openRetrospectiveModal(btn.getAttribute('data-review-decision'));
+      });
+    });
+  }
+
+  // Modal for adding retrospective
+  function openRetrospectiveModal(decisionId) {
+    const html = '<div class="editor">' +
+      '<div class="editor-row"><label>回顾</label><textarea id="retro-text" rows="6" placeholder="走对没走对? 当时没想到什么? 下次会怎么改?"></textarea></div>' +
+      '<div class="editor-row"><label>结果</label><select id="retro-outcome"><option value="good">✓ 走对了</option><option value="neutral">~ 中性</option><option value="bad">✗ 走错了</option></select></div>' +
+    '</div>';
+    if (typeof window.openModal !== 'function') return;
+    window.openModal({
+      title: '添加决策回顾',
+      type: 'decision',
+      body: html,
+      footer: '<button class="btn" data-close>取消</button><button class="btn btn-primary" id="retro-submit">保存</button>'
+    });
+    setTimeout(() => {
+      const submit = document.getElementById('retro-submit');
+      if (!submit) return;
+      submit.addEventListener('click', async () => {
+        const text = (document.getElementById('retro-text').value || '').trim();
+        const outcome = (document.getElementById('retro-outcome').value || 'neutral');
+        if (!text) { if (window.toast) window.toast('请填写回顾', 'error'); return; }
+        try {
+          await window.__api.api.update(decisionId, {
+            data: { status: 'reviewed', retrospective: text, retrospectiveAt: new Date().toISOString(), outcome }
+          });
+          if (window.toast) window.toast('回顾已保存', 'success');
+          if (typeof window.closeModal === 'function') window.closeModal();
+          const hash = location.hash;
+          location.hash = '';
+          setTimeout(() => { location.hash = hash; }, 50);
+        } catch (e) {
+          if (window.toast) window.toast('保存失败:' + e.message, 'error');
+        }
+      });
+    }, 50);
+  }
+
+  // Open the decision-creation modal. Reuses openModal from app.js via window.openModal.
+  function openDecisionModal() {
+    const html = [
+      '<div class="editor">',
+        '<div class="editor-row"><label>标题</label><input id="dc-title" placeholder="决策标题 — 例:用 Tauri 而不是 Electron" /></div>',
+        '<div class="editor-row"><label>上下文</label><textarea id="dc-context" rows="3" placeholder="为什么需要做这个决策? 当前的约束是什么?"></textarea></div>',
+        '<div class="editor-row"><label>选项</label><textarea id="dc-options" rows="3" placeholder="考虑过的选项,每行一个:&#10;- 选项 A: ...&#10;- 选项 B: ..."></textarea></div>',
+        '<div class="editor-row"><label>最终选择</label><input id="dc-decision" placeholder="选了哪个?为什么?" /></div>',
+        '<div class="editor-row"><label>标签</label><input id="dc-tags" placeholder="逗号分隔 — work, architecture" /></div>',
+      '</div>'
+    ].join('');
+    if (typeof window.openModal === 'function') {
+      window.openModal({
+        title: '新建决策',
+        type: 'decision',
+        body: html,
+        footer: '<button class="btn" data-close>取消</button><button class="btn btn-primary" id="dc-submit">创建</button>'
+      });
+      setTimeout(() => {
+        const submit = document.getElementById('dc-submit');
+        if (submit) submit.addEventListener('click', async () => {
+          const title = (document.getElementById('dc-title').value || '').trim();
+          const context = (document.getElementById('dc-context').value || '').trim();
+          const options = (document.getElementById('dc-options').value || '').trim();
+          const decision = (document.getElementById('dc-decision').value || '').trim();
+          const tags = (document.getElementById('dc-tags').value || '').split(',').map(t => t.trim()).filter(Boolean);
+          if (!title) { if (window.toast) window.toast('请输入标题', 'error'); return; }
+          const body = [
+            '## 上下文',
+            context,
+            '',
+            '## 选项',
+            options,
+            '',
+            '## 决定',
+            decision,
+          ].join('\n');
+          try {
+            const created = await window.__api.api.create({ type: 'decision', title, body, data: { context, options, decision, tags, status: 'pending' } });
+            if (window.toast) window.toast('已创建:' + title, 'success');
+            if (typeof window.closeModal === 'function') window.closeModal();
+            if (created && created.id) {
+              location.hash = '#/entity/' + encodeURIComponent(created.id);
+            } else {
+              const hash = location.hash;
+              location.hash = '';
+              setTimeout(() => { location.hash = hash; }, 50);
+            }
+          } catch (e) {
+            if (window.toast) window.toast('创建失败:' + e.message, 'error');
+          }
+        });
+      }, 50);
+    }
   }
 
   // -------------------- Weekly reflection (v0.7) --------------------
@@ -2286,6 +2474,11 @@
       if (route === 'agent') {
         content.innerHTML = renderAgent(state);
         bindAgentActions(content, state);
+        return;
+      }
+      if (route === 'decisions') {
+        content.innerHTML = renderDecisions(state);
+        bindDecisionActions(content, state);
         return;
       }
       const map = [].concat(NAV_PRIMARY, NAV_RESOURCES).reduce((m, it) => (m[it.impl] = it.label, m), {});
