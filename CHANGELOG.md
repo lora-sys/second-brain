@@ -19,6 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.6.x: canvas graph minimap, fit-to-view, edge text labels
 - v0.7: reflection agent, decision journal
 
+## [0.9.0] - 2026-07-14
+
+### Added
+- **Skills** (v0.9) — Personal Agent now has reusable instruction sets stored as markdown files in `vault/00-AI/skills/{slug}.md`.
+- Frontmatter: name / description / tags. Body: free-form markdown instructions.
+- 3 new endpoints: `GET /api/skills`, `GET /api/skills/:slug`, `POST /api/skills`.
+- Cockpit agent UI: skill chip bar above the conversation. Click → modal with body.
+- Quick prompt: "保存当前对话为 skill" — opens save modal pre-filled with the last assistant response.
+- Inline "↻ 存为 skill" button on each assistant response.
+- **Skill loader (v0.9.x)** — agent auto-queries `GET /api/skills?q=<prompt>` to find matching skills (keyword overlap on name/description/tags), and injects them into the default-branch response. Response meta shows "N skill(s) 注入".
+
+### Test coverage
+- 78 E2E tests pass (was 72 before v0.9)
+- 49 Rust unit tests pass 5/5
+
 ## [0.8.0] - 2026-07-14
 
 ### Added
