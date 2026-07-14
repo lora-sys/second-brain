@@ -2974,3 +2974,142 @@ body.cockpit-mode .app { display: none !important; }
   border-radius: 4px;
   font-size: 12px;
 }
+
+/* ============================================================================
+ * v0.4.c6.模板 — Cockpit Templates Section
+ * Lists templates per entity type. Each card has emoji, name, description,
+ * tags, body preview, and "use" / "copy body" actions.
+ * ========================================================================== */
+
+.cockpit-templates { max-width: 1100px; margin: 0 auto; }
+.cockpit-templates-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  background: var(--surface-1);
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+}
+.cockpit-templates-hero svg {
+  color: var(--accent-strong);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.cockpit-templates-hero h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 600;
+}
+.cockpit-templates-hero p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.cockpit-templates-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.cockpit-template-group-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.cockpit-template-group-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.cockpit-template-group-count {
+  font-size: 12px;
+  color: var(--text-soft);
+  padding: 2px 10px;
+  background: var(--surface-2);
+  border-radius: 12px;
+}
+
+.cockpit-template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+.cockpit-template-card {
+  background: var(--surface-1);
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cockpit-template-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cockpit-template-emoji {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.cockpit-template-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.cockpit-template-desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+.cockpit-template-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.cockpit-template-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+}
+.cockpit-template-body {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-soft);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow: auto;
+}
+.cockpit-template-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+.cockpit-template-actions .btn { flex: 1; justify-content: center; }
+
+.cockpit-templates-empty {
+  text-align: center;
+  padding: 60px 20px;
+  background: var(--surface-1);
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+}
+.cockpit-templates-empty svg { color: var(--text-faint); margin-bottom: 12px; }
+.cockpit-templates-empty h2 { margin: 0 0 6px; font-size: 16px; }
+.cockpit-templates-empty p { margin: 0; font-size: 13px; color: var(--text-soft); }

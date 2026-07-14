@@ -25,7 +25,7 @@
   ];
   const NAV_RESOURCES = [
     { hash: '#/resources', label: '资源库', icon: 'folder', impl: 'links' },
-    { hash: '#/templates', label: '模板', icon: 'copy', impl: 'soon' },
+    { hash: '#/templates', label: '模板', icon: 'copy', impl: 'templates' },
     { hash: '#/tags', label: '标签', icon: 'tag', impl: 'tags' },
     { hash: '#/agent', label: '智能体', icon: 'sparkle', impl: 'soon' },
     { hash: '#/settings', label: '设置', icon: 'settings', impl: 'settings' },
@@ -1003,7 +1003,385 @@
       + '</div>';
   }
 
-  // -------------------- Knowledge graph helpers (v0.4.c6.知识图谱) --------------------
+  // -------------------- Templates (v0.4.c6.模板) --------------------
+  // Pre-defined starter templates per entity type. Each template pre-fills
+  // the body + tags when the user picks it from the cockpit Templates page
+  // or from the quick-add flow. Templates live in JS, not in the vault,
+  // because they should be available even when the vault is empty.
+  const TEMPLATES = {
+    person: [
+      {
+        id: 'person-colleague',
+        name: '同事',
+        emoji: '💼',
+        description: '工作关系,记下职责、Slack、协作历史。',
+        tags: ['colleague', 'work'],
+        body: [
+          '## 联系方式',
+          '',
+          '- Slack:',
+          '- Email:',
+          '',
+          '## 协作记录',
+          '',
+          '- ',
+          '',
+        ].join('\n'),
+      },
+      {
+        id: 'person-friend',
+        name: '朋友',
+        emoji: '🤝',
+        description: '私人关系,什么时候认识、共同回忆。',
+        tags: ['friend', 'personal'],
+        body: [
+          '我们是在 [地点 / 活动] 认识的。',
+          '',
+          '- 共同点:',
+          '- 上次见面:',
+          '',
+        ].join('\n'),
+      },
+      {
+        id: 'person-family',
+        name: '家人',
+        emoji: '🏠',
+        description: '家人 / 亲戚,记生日、爱好、最近的事。',
+        tags: ['family', 'personal'],
+        body: [
+          '## 基础信息',
+          '',
+          '- 生日:',
+          '- 爱好:',
+          '',
+          '## 最近',
+          '',
+          '- ',
+          '',
+        ].join('\n'),
+      },
+    ],
+    task: [
+      {
+        id: 'task-default',
+        name: '默认任务',
+        emoji: '✅',
+        description: '通用任务,默认 open 状态、中优先级。',
+        tags: ['work'],
+        body: [
+          '## 上下文',
+          '',
+          '',
+          '## 步骤',
+          '',
+          '- [ ] ',
+          '',
+        ].join('\n'),
+      },
+      {
+        id: 'task-retro',
+        name: '复盘',
+        emoji: '🔁',
+        description: '事后总结,记录做得好的、做得不好的、下次改什么。',
+        tags: ['planning', 'reflection'],
+        body: [
+          '## 做得好的',
+          '',
+          '- ',
+          '',
+          '## 做得不好的',
+          '',
+          '- ',
+          '',
+          '## 下次改',
+          '',
+          '- ',
+          '',
+        ].join('\n'),
+      },
+      {
+        id: 'task-meeting',
+        name: '会议',
+        emoji: '👥',
+        description: '会议纪要,记录参与者、议题、决议、Action items。',
+        tags: ['work', 'meeting'],
+        body: [
+          '## 参与者',
+          '',
+          '- ',
+          '',
+          '## 议题',
+          '',
+          '1. ',
+          '',
+          '## 决议',
+          '',
+          '- ',
+          '',
+          '## Action Items',
+          '',
+          '- [ ] ',
+          '',
+        ].join('\n'),
+      },
+    ],
+    project: [
+      {
+        id: 'project-side',
+        name: '副业项目',
+        emoji: '🌱',
+        description: '个人项目,记目标、当前状态、下一步。',
+        tags: ['personal', 'side'],
+        body: [
+          '## 目标',
+          '',
+          '',
+          '## 当前状态',
+          '',
+          '',
+          '## 下一步',
+          '',
+          '- [ ] ',
+          '',
+        ].join('\n'),
+      },
+      {
+        id: 'project-work',
+        name: '工作项目',
+        emoji: '🏢',
+        description: '工作项目,记团队、里程碑、风险。',
+        tags: ['work'],
+        body: [
+          '## 团队',
+          '',
+          '- ',
+          '',
+          '## 里程碑',
+          '',
+          '- [ ] ',
+          '',
+          '## 风险',
+          '',
+          '- ',
+          '',
+        ].join('\n'),
+      },
+      {
+        id: 'project-research',
+        name: '研究 / 探索',
+        emoji: '🔬',
+        description: '研究类项目,记假设、读到的资料、结论。',
+        tags: ['research', 'learning'],
+        body: [
+          '## 假设',
+          '',
+          '',
+          '## 读到的资料',
+          '',
+          '- ',
+          '',
+          '## 结论',
+          '',
+          '',
+        ].join('\n'),
+      },
+    ],
+    link: [
+      {
+        id: 'link-article',
+        name: '文章',
+        emoji: '📰',
+        description: '想读 / 已读的文章,记核心观点、行动项。',
+        tags: ['reading', 'article'],
+        body: [
+          '## 核心观点',
+          '',
+          '',
+          '## 我的反应',
+          '',
+          '',
+          '## 行动项',
+          '',
+          '- [ ] ',
+          '',
+        ].join('\n'),
+      },
+      {
+        id: 'link-tool',
+        name: '工具',
+        emoji: '🛠️',
+        description: '软件 / 库 / 服务,记用途、试用情况。',
+        tags: ['tool'],
+        body: [
+          '## 用途',
+          '',
+          '',
+          '## 试用情况',
+          '',
+          '- 安装:',
+          '- 试过的功能:',
+          '- 评价:',
+          '',
+        ].join('\n'),
+      },
+      {
+        id: 'link-video',
+        name: '视频',
+        emoji: '🎬',
+        description: '视频 / 播客,记关键时间戳、笔记。',
+        tags: ['video'],
+        body: [
+          '## 时间戳',
+          '',
+          '- 00:00 —',
+          '',
+          '## 笔记',
+          '',
+          '',
+        ].join('\n'),
+      },
+    ],
+  };
+
+  const TEMPLATE_TYPE_LABELS = {
+    person: '人物', task: '任务', project: '项目', link: '链接',
+  };
+
+  // Group templates by type for the cockpit page
+  function groupedTemplates() {
+    const out = [];
+    for (const type of ['person', 'task', 'project', 'link']) {
+      const items = TEMPLATES[type] || [];
+      if (items.length > 0) out.push({ type, label: TEMPLATE_TYPE_LABELS[type], items });
+    }
+    return out;
+  }
+
+  // Render the templates cockpit page
+  function renderTemplates(state) {
+    const groups = groupedTemplates();
+    const totalCount = groups.reduce((s, g) => s + g.items.length, 0);
+    if (totalCount === 0) {
+      return [
+        '<div class="cockpit-templates">',
+          '<div class="cockpit-templates-empty">',
+            icon('copy', 28),
+            '<h2>模板库还没准备好</h2>',
+            '<p>新建一个 entry 就能使用模板。</p>',
+          '</div>',
+        '</div>'
+      ].join('');
+    }
+    const hero = [
+      '<header class="cockpit-templates-hero">',
+        icon('copy', 24),
+        '<div>',
+          '<h1>模板</h1>',
+          '<p>' + totalCount + ' 个模板 · 4 种类型。点模板预览,然后「使用」直接新建 entry。</p>',
+        '</div>',
+      '</header>'
+    ].join('');
+    const groupsHtml = groups.map(g => {
+      const cardsHtml = g.items.map(t => {
+        const tagsHtml = (t.tags || []).map(tag => '<span class="cockpit-template-tag">#' + esc(tag) + '</span>').join('');
+        return [
+          '<article class="cockpit-template-card" data-template-id="' + esc(t.id) + '">',
+            '<header class="cockpit-template-card-header">',
+              '<span class="cockpit-template-emoji">' + esc(t.emoji) + '</span>',
+              '<h3 class="cockpit-template-name">' + esc(t.name) + '</h3>',
+            '</header>',
+            '<p class="cockpit-template-desc">' + esc(t.description) + '</p>',
+            '<div class="cockpit-template-tags">' + tagsHtml + '</div>',
+            '<pre class="cockpit-template-body">' + esc(t.body) + '</pre>',
+            '<div class="cockpit-template-actions">',
+              '<button class="btn btn-primary btn-sm" data-template-use="' + esc(t.id) + '">使用模板</button>',
+              '<button class="btn btn-ghost btn-sm" data-template-copy="' + esc(t.id) + '">复制 body</button>',
+            '</div>',
+          '</article>'
+        ].join('');
+      }).join('');
+      return [
+        '<section class="cockpit-template-group">',
+          '<header class="cockpit-template-group-header">',
+            '<h2>' + esc(g.label) + '</h2>',
+            '<span class="cockpit-template-group-count">' + g.items.length + ' 个模板</span>',
+          '</header>',
+          '<div class="cockpit-template-grid">' + cardsHtml + '</div>',
+        '</section>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="cockpit-templates">',
+        hero,
+        '<div class="cockpit-templates-groups">' + groupsHtml + '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  // Wire template actions in the rendered template page
+  function bindTemplateActions(content) {
+    content.querySelectorAll('[data-template-use]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-template-use');
+        const tpl = findTemplate(id);
+        if (!tpl) return;
+        // Pre-fill quick add: open modal with the template body pre-filled
+        const title = window.prompt('使用模板「' + tpl.name + '」 — 请输入标题:', '');
+        if (title == null || !title.trim()) return;
+        createFromTemplate(tpl, title.trim());
+      });
+    });
+    content.querySelectorAll('[data-template-copy]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-template-copy');
+        const tpl = findTemplate(id);
+        if (!tpl) return;
+        try {
+          await navigator.clipboard.writeText(tpl.body);
+          toast('已复制 body 到剪贴板', 'success');
+        } catch (e) {
+          toast('复制失败:' + e.message, 'error');
+        }
+      });
+    });
+  }
+
+  function findTemplate(id) {
+    for (const type of Object.keys(TEMPLATES)) {
+      const t = TEMPLATES[type].find(x => x.id === id);
+      if (t) return t;
+    }
+    return null;
+  }
+
+  function findTemplateType(id) {
+    for (const type of Object.keys(TEMPLATES)) {
+      if (TEMPLATES[type].find(x => x.id === id)) return type;
+    }
+    return null;
+  }
+
+  async function createFromTemplate(tpl, title) {
+    const type = findTemplateType(tpl.id);
+    if (!type) return;
+    try {
+      const created = await window.__api.create({ type, title, body: tpl.body, data: { tags: tpl.tags } });
+      toast('已创建:' + title, 'success');
+      // Navigate to the new entity
+      if (created && created.id) {
+        location.hash = '#/entity/' + created.id;
+      } else {
+        // Refresh the current route
+        if (window.__appRouteImpl && window.__cockpit.renderContent) {
+          window.__cockpit.renderContent('templates', location.hash);
+        }
+      }
+    } catch (err) {
+      toast('创建失败:' + err.message, 'error');
+    }
+  }
+
+    // -------------------- Knowledge graph helpers (v0.4.c6.知识图谱) --------------------
   // Build a graph from wikilinks + shared tags. Two entities are connected if:
   //   - One has a wikilink to the other ([[type/slug]] or [[slug]])
   //   - They share at least one tag
@@ -1213,6 +1591,11 @@
       }
       if (route === 'knowledge') {
         content.innerHTML = renderKnowledge(state);
+        return;
+      }
+      if (route === 'templates') {
+        content.innerHTML = renderTemplates(state);
+        bindTemplateActions(content);
         return;
       }
       const map = [].concat(NAV_PRIMARY, NAV_RESOURCES).reduce((m, it) => (m[it.impl] = it.label, m), {});
