@@ -99,6 +99,9 @@ _None._
 
 | PR | Title | Evidence |
 |---|---|---|
+| `1a3cc0c` | chore(release): v0.5.0-alpha (event stream + daily memory) | [docs/evidence/v0.5.4-daily-timeline/](evidence/v0.5.4-daily-timeline/) |
+| `57c2ba6` | merge: feature/v0.5.4-daily-timeline (7-day daily timeline) | [docs/evidence/v0.5.4-daily-timeline/](evidence/v0.5.4-daily-timeline/) |
+| `8dbf510` | merge: feature/v0.5.1-fs-watcher (FS watcher for external vault changes) | [docs/evidence/v0.5.1-fs-watcher/](evidence/v0.5.1-fs-watcher/) |
 | `a250637` | merge: feature/v0.5-event-stream (event stream + daily journal) | [docs/evidence/v0.5-event-stream/](evidence/v0.5-event-stream/) |
 | `d340e5f` | merge: feature/v0.4.c6-agent (智能体 — last cockpit placeholder) | [docs/evidence/v0.4.c6-agent/](evidence/v0.4.c6-agent/) |
 | `3d6d660` | merge: feature/v0.4.c6-templates (templates section) | [docs/evidence/v0.4.c6-templates/](evidence/v0.4.c6-templates/) |
