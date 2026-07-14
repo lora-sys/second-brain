@@ -350,3 +350,10 @@
 - **52/52 E2E pass** — 3 new tests for the backlinks panel.
 - **Pattern**: this is the v0.6 piece the roadmap called for ("Backlinks panel on every detail page"). Phase 3 (Knowledge Graph + Semantic Search) is now 25% done.
 - **144 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.6.1 + v0.6.2 — small polish + agent persistence)
+
+- **v0.6.1 — Daily timeline auto-refreshes** after clicking "生成今天的日记" (page re-navigates via hash-toggle).
+- **v0.6.2 — Agent conversation persistence** in localStorage. Key `sb-agent-history-v1`. "清空历史" button for explicit reset.
+- **52/52 E2E pass** throughout. No regressions.
+- **148 commits on main** — pushed to origin.
