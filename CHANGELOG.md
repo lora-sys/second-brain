@@ -19,6 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v0.6.x: canvas graph minimap, fit-to-view, edge text labels
 - v0.7: reflection agent, decision journal
 
+## [0.8.0] - 2026-07-14
+
+### Added
+- **Decision Journal** (v0.8) — new entity type `decision` with full schema (context, options, decision, status, retrospective, outcome, madeAt, tags).
+- New cockpit section: 决策 — 4 status cards (总数 / 待回顾 / 已回顾 / 需回顾 30+ 天) + sorted list with age badges.
+- Retrospective modal: 添加回顾 button on each pending/old decision.
+- Pending decisions older than 30 days show a ⏰ "需要回顾" warning.
+- New directory: `50-Decisions/`. Default mapping in `config.json`.
+
+### Test coverage
+- 72 E2E tests pass (was 64 before v0.8)
+- 49 Rust unit tests pass 5/5
+
 ## [0.7.0] - 2026-07-14
 
 ### Added
