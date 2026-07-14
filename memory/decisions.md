@@ -297,3 +297,12 @@
 - **41/41 E2E pass** — 7 new tests for daily + events endpoints.
 - **12 nav items total** (was 11) — added 日记.
 - **122 commits on main** — pushed to origin.
+
+## 2026-07-14 (v0.5.1 FS watcher landed)
+
+- **External edits picked up** — `FsWatcher` watches the vault directory using `fs.watch` (recursive on mac/Windows, per-dir fallback on Linux). Emits `file.changed` events for any `.md`/`.markdown` change.
+- **250ms debounce per path** — rapid saves from editors don't fire multiple events.
+- **Filters** — `.obsidian/`, `.trash/`, `.git/`, `node_modules/`, `.events/` ignored. Only markdown files surface.
+- **entityType guessing** — derives `person`/`task`/`project`/`link` from the parent directory name (`10-People/` → `person`, etc.).
+- **Daily journal integration** — file.changed events now show in the daily under "## 文件变化" with their paths. Users see "I edited 3 things in Obsidian" alongside app events.
+- **127 commits on main** — pushed to origin.
