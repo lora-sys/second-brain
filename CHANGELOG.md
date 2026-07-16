@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **v0.20 — MCP resources + prompts (ADR-0006 continuation)** — MCP server (`lib/mcp.mjs`) now exposes 5 resources (`vault://entities`, `vault://recent`, `vault://tags`, `vault://graph`, `vault://skills`) and 4 prompts (`summarize-week`, `draft-decision`, `consolidate-tasks`, `reflect-on-day`). Capabilities declared as `{tools, resources, prompts}`. Version bumped to 0.20.0. New modules `lib/mcp-resources.mjs` (131 lines) and `lib/mcp-prompts.mjs` (113 lines). 45 new unit tests in `tests/mcp.test.mjs`. End-to-end smoke verified via JSON-RPC over stdio against the real server. No new npm deps.
+
 ### Changed
 - **v0.19 — Extract `buildGraph` to lib/** — knowledge-graph builder lifted from `public/lib/cockpit.js` (~73 lines) to `lib/graph.mjs` (server-side, 112 lines) + `public/lib/cockpit-graph.js` (browser IIFE, 103 lines). Same algorithm in both, per project's existing "self-contained modules" pattern. Bug discovered during extraction: original returned `edges[].reasons` as `Set` — JSON would have lost them silently; v0.19 normalizes to `Array`. 37 new unit tests; 2 new e2e tests. cockpit.js: 2884 → 2864 lines.
 - **v0.30 — Real LLM agent (ADR-0009)** — cockpit agent now calls `POST /api/agent` (server-side `runAgent`) when the user has configured `llm.apiKey` (or `llm.baseUrl`). Privacy: compact system prompt (vault counts + 5 most-recent entity titles + matched-skill names). Falls back to in-browser local-echo on network/server error and surfaces a "⚠ API 调用失败" badge. New `lib/agent.mjs` (162 lines). 16 new unit tests. 4 new e2e tests. No new npm deps.
