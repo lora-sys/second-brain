@@ -506,6 +506,13 @@
 
 
 
+
+## 2026-07-16 (v0.18 in-app LLM configuration, ADR-0008)
+
+- **Migrated LLM credentials from env to config.json**. Settings panel renders three new inputs (API Key, Base URL, Model). GET redacts the key as `••••••••<last4>` with a `configured` boolean. PUT handles mask-as-no-op vs explicit-clear vs real-key. POST `/api/llm/test` pings the provider.
+- **33 unit tests** in `tests/llm-config.test.mjs`. 4 E2E tests.
+- **Bug fix**: `lib/weekly.mjs#pickProvider` was using `require('./llm/openai.mjs')` — doesn't work in ESM; weekly.mjs had silently fallen back to local-echo. Replaced with proper ESM import and aligned with daily.mjs's `opts`-aware signature.
+- **ADR-0008** documents the env → config migration, threat model, and encryption-at-rest follow-up.
 ## 2026-07-16 (v0.15 insight widget E2E closeout)
 
 - **5 new E2E tests** for the v0.12 insight widget at the cockpit dashboard.
