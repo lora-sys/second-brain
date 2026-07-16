@@ -504,6 +504,12 @@
 - **205 commits on main** — pushed to origin.
 
 
+
+## 2026-07-16 (v0.16 extract Recent Activity)
+
+- **Pulled renderRecentActivity out of cockpit.js** into `public/lib/cockpit-activity.js` (141 lines). cockpit.js shrinks by ~80 lines (2960 → 2884).
+- **Exposed TYPE_LABELS / TYPE_DOTS** as constants so tests can verify parity (every key in one is in the other). Added `task.in_progress` mapping (was missing — those events were rendering as raw type strings).
+- **55 + 2 = 57 unit tests** via jsdom. Wired into `npm run check`. E2E: 4 new tests.
 ## 2026-07-15 (v0.17 sanitize markdown)
 
 - **Markdown output now flows through an allowlist sanitizer** (`public/lib/sanitize.js` + `lib/sanitize.mjs` mirror). 31 unit tests pass. E2E tests added to `real-device.mjs`.
