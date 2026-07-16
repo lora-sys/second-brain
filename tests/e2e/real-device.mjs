@@ -463,6 +463,89 @@ async (page) => {
   });
   await shot('docs/evidence/v0.15-insight-e2e/screenshots/02-post-insight.png').catch(() => {});
 
+  // ---- v0.18: LLM config (settings UI) E2E ----
+  await t('llm-config: settings page renders three new fields + status', async () => {
+    await page.goto(BASE + '/?cockpit=1&v=' + Date.now() + '#/settings');
+    await page.waitForTimeout(2500);
+    const r = await page.evaluate(() => {
+      const main = document.querySelector('#main');
+      if (!main) return 'no_main';
+      const apikey = main.querySelector('#cfg-llm-apikey');
+      const baseurl = main.querySelector('#cfg-llm-baseurl');
+      const model = main.querySelector('#cfg-llm-model');
+      const status = main.querySelector('#cfg-llm-status');
+      const editBtn = main.querySelector('[data-action="llm-apikey-edit"]');
+      const clearBtn = main.querySelector('[data-action="llm-apikey-clear"]');
+      const testBtn = main.querySelector('[data-action="llm-test"]');
+      const sectionH = Array.from(main.querySelectorAll('h3')).find(h => h.textContent.includes('LLM'));
+      return {
+        apikey: !!apikey,
+        baseurl: !!baseurl,
+        model: !!model,
+        status: status ? status.textContent.trim() : null,
+        sectionTitle: sectionH ? sectionH.textContent : null,
+        editBtn: !!editBtn,
+        clearBtn: !!clearBtn,
+        testBtn: !!testBtn,
+      };
+    });
+    if (!r.apikey || !r.baseurl || !r.model) throw new Error('missing fields: ' + JSON.stringify(r));
+    if (!r.editBtn || !r.clearBtn || !r.testBtn) throw new Error('missing buttons');
+    if (!r.sectionTitle || !r.sectionTitle.includes('LLM')) throw new Error('missing LLM section title');
+    if (!r.status || (!r.status.includes('已配置') && !r.status.includes('未配置'))) {
+      throw new Error('status missing: ' + r.status);
+    }
+  });
+  await t('llm-config: GET /api/config does not expose raw apiKey', async () => {
+    const r = await page.evaluate(async () => {
+      const x = await fetch('/api/config');
+      const d = await x.json();
+      const apiKey = (d && d.llm && d.llm.apiKey) || '';
+      const configured = (d && d.llm && d.llm.configured) || false;
+      // Raw keys look like 'sk-...'. Our mask looks like '••••••••1234'. Empty is also fine.
+      const looksLikeRaw = apiKey.length > 16 && !apiKey.includes('•');
+      return { apiKeyPreview: apiKey.slice(0, 5), isConfigured: configured, looksLikeRaw };
+    });
+    if (r.looksLikeRaw) throw new Error('raw apiKey leaked in GET: ' + r.apiKeyPreview);
+  });
+  await t('llm-config: PUT /api/config redacts apiKey in response', async () => {
+    const r = await page.evaluate(async () => {
+      // Send a fake new key. Server should accept and redacted response.
+      const x = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ llm: { apiKey: 'sk-test-' + Date.now(), baseUrl: 'http://127.0.0.1:65533/v1', model: 'm-test' } }),
+      });
+      const d = await x.json();
+      return { ok: x.ok, llm: d.llm, status: x.status };
+    });
+    if (!r.ok) throw new Error('PUT failed: ' + r.status);
+    if (!r.llm || !r.llm.configured) throw new Error('server did not mark as configured');
+    if (r.llm.apiKey && !r.llm.apiKey.includes('•')) throw new Error('PUT response leaked raw key');
+  });
+  await t('llm-config: PUT with mask-like value is treated as no-op', async () => {
+    // Use an existing configured value, then PUT the mask-only string. Should
+    // remain unchanged in the next GET.
+    await page.evaluate(async () => {
+      await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ llm: { apiKey: 'sk-keep-me-1234' } }),
+      });
+    });
+    const r = await page.evaluate(async () => {
+      const x = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ llm: { apiKey: '••••••••1234' } }), // mask form → keep existing
+      });
+      const d = await x.json();
+      return d.llm;
+    });
+    if (!r.configured) throw new Error('mask-as-value wiped the key!');
+    if (!r.apiKey || !r.apiKey.includes('•')) throw new Error('raw key leaked on mask-as-value: ' + r.apiKey);
+  });
+
   // ---- v0.16: Recent Activity component E2E ----
   await t('activity: window.__cockpitActivity exposed with renderRecentActivity', async () => {
     await page.goto(BASE + '/?cockpit=1&v=' + Date.now() + '#/dashboard');

@@ -1108,6 +1108,40 @@
           <button class="btn btn-primary" data-action="save">保存</button>
         </div>
         <div class="hr"></div>
+        <h3 style="margin: 0 0 8px; font-size: 14px;">LLM (云端模型 — 可选)</h3>
+        <p class="muted" style="font-size: 12px; margin-top: 0;">
+          留空则使用本地 echo 生成器。设置后,日记/周报生成会调用 OpenAI 兼容 API。
+          API key 不会在 <code>GET /api/config</code> 中以明文返回。
+        </p>
+        <div class="editor-row">
+          <label>Provider 状态</label>
+          <div id="cfg-llm-status" class="muted" style="font-size: 13px;"></div>
+        </div>
+        <div class="editor-row">
+          <label>API Key</label>
+          <div style="display:flex; gap:6px; align-items:center; flex: 1;">
+            <input id="cfg-llm-apikey" type="password" placeholder="sk-…" readonly
+              style="flex:1; font-family: 'JetBrains Mono', monospace;" />
+            <button class="btn btn-sm" data-action="llm-apikey-edit" title="替换 API key">替换</button>
+            <button class="btn btn-sm" data-action="llm-apikey-clear" title="清除已配置的 API key">清除</button>
+          </div>
+        </div>
+        <div class="editor-row">
+          <label>Base URL</label>
+          <input id="cfg-llm-baseurl" type="text" placeholder="https://api.openai.com/v1  (留空使用默认)" />
+        </div>
+        <div class="editor-row">
+          <label>Model</label>
+          <input id="cfg-llm-model" type="text" placeholder="gpt-4o-mini  (留空使用默认)" />
+        </div>
+        <div class="editor-row">
+          <label>测试连接</label>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <button class="btn btn-sm" data-action="llm-test" id="cfg-llm-test-btn">测试</button>
+            <span id="cfg-llm-test-result" class="muted" style="font-size: 12px;"></span>
+          </div>
+        </div>
+        <div class="hr"></div>
         <h3 style="margin: 0 0 8px; font-size: 14px;">主题</h3>
         <div class="editor-row">
           <label>外观</label>
@@ -1136,12 +1170,94 @@
           link: $('#cfg-dir-link').value.trim(),
           dashboard: $('#cfg-dir-dashboard').value.trim(),
         },
+        llm: {
+          baseUrl: $('#cfg-llm-baseurl').value.trim(),
+          model: $('#cfg-llm-model').value.trim(),
+          // API key handling: only send if the field is currently in edit mode
+          // (i.e. the placeholder is empty after click on '替换'), in which
+          // case the user's typed value is what we send. The mask that the
+          // server returns on subsequent GETs never re-sent (UI keeps the
+          // readonly mask visible).
+          apiKey: $('#cfg-llm-apikey').dataset.editing === '1'
+            ? $('#cfg-llm-apikey').value
+            : '',
+        },
       };
       try {
         const next = await api.config.put(body);
         state.config = next;
         toast('已保存。重启服务器后端口 / 地址生效。', 'success');
+        // Rerender to refresh masked state
+        renderSettings();
       } catch (err) { toast(err.message, 'error'); }
+    });
+
+    // Populate LLM fields from the (already-redacted) config
+    const llmCfg = (cfg.llm) || {};
+    const statusEl = $('#cfg-llm-status');
+    if (statusEl) {
+      if (llmCfg.configured) {
+        statusEl.innerHTML = '<span style="color: var(--accent, #22c55e);">●</span> 已配置 (key: <code>' + escapeHtml(llmCfg.apiKey || '••••') + '</code>)';
+      } else {
+        statusEl.innerHTML = '<span style="color: var(--muted, #888);">○</span> 未配置 — 生成时使用 local-echo';
+      }
+    }
+    const apikeyInput = $('#cfg-llm-apikey');
+    if (apikeyInput) {
+      apikeyInput.value = llmCfg.apiKey || '';
+      apikeyInput.dataset.editing = '0';
+    }
+    const baseurlInput = $('#cfg-llm-baseurl');
+    if (baseurlInput) baseurlInput.value = llmCfg.baseUrl || '';
+    const modelInput = $('#cfg-llm-model');
+    if (modelInput) modelInput.value = llmCfg.model || '';
+
+    main.querySelectorAll('[data-action="llm-apikey-edit"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const inp = $('#cfg-llm-apikey');
+        if (!inp) return;
+        inp.readOnly = false;
+        inp.type = 'text';
+        inp.value = '';
+        inp.placeholder = '粘贴新的 API key';
+        inp.dataset.editing = '1';
+        inp.focus();
+      });
+    });
+    main.querySelectorAll('[data-action="llm-apikey-clear"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('确定要清除已配置的 API key 吗?清除后,生成器会回到 local-echo。')) return;
+        try {
+          await api.config.put({ llm: { clearApiKey: true } });
+          state.config = await api.config.get();
+          toast('已清除 API key', 'success');
+          renderSettings();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+    });
+    main.querySelectorAll('[data-action="llm-test"]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const result = $('#cfg-llm-test-result');
+        if (result) result.textContent = '测试中…';
+        try {
+          // Read the values currently in the form, persist them, and test.
+          await api.config.put({
+            llm: {
+              baseUrl: $('#cfg-llm-baseurl').value.trim(),
+              model: $('#cfg-llm-model').value.trim(),
+              apiKey: $('#cfg-llm-apikey').dataset.editing === '1'
+                ? $('#cfg-llm-apikey').value
+                : '',
+            },
+          });
+          // Reload the masked state so the field is no longer in edit-mode.
+          state.config = await api.config.get();
+          const r = await api.post('/api/llm/test');
+          if (result) result.innerHTML = '<span style="color: var(--accent, #22c55e);">✓</span> OK — provider: <code>' + escapeHtml((r && r.provider && r.provider.name) || 'unknown') + '</code>';
+        } catch (err) {
+          if (result) result.innerHTML = '<span style="color: #ef4444;">✗</span> ' + escapeHtml(err.message);
+        }
+      });
     });
     main.querySelectorAll('[data-action="set-theme"]').forEach((btn) => {
       btn.addEventListener('click', () => {
