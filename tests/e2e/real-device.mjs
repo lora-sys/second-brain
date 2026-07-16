@@ -383,6 +383,64 @@ async (page) => {
     if (blockDate !== apiDate) throw new Error('date mismatch: ' + blockDate + ' vs ' + apiDate);
   });
 
+  // ---- v0.16: Recent Activity component E2E ----
+  await t('activity: window.__cockpitActivity exposed with renderRecentActivity', async () => {
+    await page.goto(BASE + '/?cockpit=1&v=' + Date.now() + '#/dashboard');
+    await page.waitForTimeout(2500);
+    const exposed = await page.evaluate(() => !!window.__cockpitActivity && typeof window.__cockpitActivity.renderRecentActivity === 'function' && typeof window.__cockpitActivity.TYPE_LABELS === 'object' && typeof window.__cockpitActivity.TYPE_DOTS === 'object');
+    if (!exposed) throw new Error('window.__cockpitActivity not exposed as expected');
+  });
+  await t('activity: dashboard renders the 近期活动 block', async () => {
+    await page.goto(BASE + '/?cockpit=1&v=' + Date.now() + '#/dashboard');
+    await page.waitForTimeout(2500);
+    const ok = await page.evaluate(() => {
+      const block = document.querySelector('.block-activity');
+      if (!block) return 'no_block';
+      const title = block.querySelector('.cockpit-block-title');
+      const ul = block.querySelector('ul.cockpit-list, p.cockpit-block-empty');
+      return title && title.textContent.trim() === '近期活动' && ul ? 'ok' : 'wrong_shape';
+    });
+    if (ok !== 'ok') throw new Error('activity block shape: ' + ok);
+  });
+  await t('activity: rows (if any) use known dot classes for typed events', async () => {
+    await page.goto(BASE + '/?cockpit=1&v=' + Date.now() + '#/dashboard');
+    await page.waitForTimeout(2500);
+    const dotsOk = await page.evaluate(() => {
+      const allowed = new Set(['dot-task','dot-project','dot-person','dot-link','dot-decision']);
+      for (const dot of document.querySelectorAll('.block-activity .cockpit-list-dot')) {
+        // Each dot has at least one class in the known taxonomy OR matches 'dot-*'.
+        // Acceptable whitelist here is the component's allowed set.
+        let ok = false;
+        for (const cls of dot.classList) {
+          if (allowed.has(cls)) { ok = true; break; }
+        }
+        if (!ok) return 'unknown_dot_class:' + dot.className;
+      }
+      return 'ok';
+    });
+    if (dotsOk !== 'ok') throw new Error(dotsOk);
+  });
+  await t('activity: web-component returns same article wrapper as expected', async () => {
+    await page.goto(BASE + '/?cockpit=1&v=' + Date.now() + '#/dashboard');
+    await page.waitForTimeout(2500);
+    // Sanity check at API layer: stub window.__api.api.get for /api/events to
+    // exercise the empty path on-demand.
+    const html = await page.evaluate(async () => {
+      // Stub the API to return [] for /api/events.
+      const original = window.__api.api.get;
+      window.__api.api.get = async (url) => {
+        if (url === '/api/events?days=7') return { events: [] };
+        return original ? original(url) : { events: [] };
+      };
+      const h = await window.__cockpitActivity.renderRecentActivity();
+      window.__api.api.get = original;
+      return h;
+    });
+    if (!html.includes('block-activity')) throw new Error('missing class');
+    if (!html.includes('近期活动')) throw new Error('missing title');
+    if (!html.includes('过去 7 天没有事件流')) throw new Error('missing empty msg');
+  });
+
   // ---- v0.17: Sanitize E2E tests ----
   // Verify the in-browser sanitizer strips the standard XSS vectors while
   // keeping markdown output intact. Sanitizer is exposed as window.sbSanitize.
