@@ -1099,6 +1099,63 @@ let journals = [];
   // the agent generates the corresponding action alongside the response.
   // Skills (loaded by bindAgentActions) get injected into the default branch
   // so the response mentions them when nothing else matches.
+
+  // v0.30 — server-first agent dispatch. Falls back to the in-browser
+  // local-echo agentComplete() if the server call returns an error or 5xx.
+  async function callAgentWithFallback(prompt, state, skills) {
+    const fbActions = (function () {
+      // Local-echo's action regex — small enough to keep here too, so the
+      // fallback path is fully self-contained. (The agentComplete() function
+      // also computes these; we duplicate the regex checks via its
+      // return value.)
+      return [];
+    })();
+    try {
+      const r = await window.__api.api.post('/api/agent', { prompt });
+      if (r && r.text != null && !r.error) {
+        return {
+          text: r.text,
+          provider: r.provider || { name: 'unknown', model: 'unknown' },
+          durationMs: r.durationMs || 0,
+          skillsLoaded: r.skillsLoaded || 0,
+          source: 'server',
+          actions: localEchoActions(prompt, state),
+        };
+      }
+      // Server-returned error → fall back
+      const fb = agentComplete(prompt, state, skills);
+      return { ...fb, apiError: r && r.error };
+    } catch (e) {
+      const fb = agentComplete(prompt, state, skills);
+      return { ...fb, apiError: e.message || String(e) };
+    }
+  }
+
+  // Mirror of agentComplete()'s action-detection regex, exposed for the
+  // server-first path so actions still execute when the LLM is online.
+  function localEchoActions(prompt, state) {
+    const actions = [];
+    if (/新建.*任务|帮我.*任务|create.*task/i.test(prompt)) {
+      let title = '';
+      const m = prompt.match(/(?:任务[:：])\s*(.+)/i);
+      if (m) title = m[1].trim();
+      else {
+        const m2 = prompt.match(/(?:create\s*task[:：]?)\s*(.+)/i);
+        if (m2) title = m2[1].trim();
+      }
+      if (title) actions.push({ type: 'create_task', payload: { type: 'task', title } });
+    } else if (/标完成|标.*done|完成.*任务/i.test(prompt)) {
+      const e = (state && state.entities) || {};
+      const tasks = (e.task || []).filter(t => (t.data && (t.data.status === 'open' || !t.data.status)));
+      if (tasks.length > 0) {
+        tasks.sort((a, b) => ((b.data && b.data.updated) || '').localeCompare((a.data && a.data.updated) || ''));
+        const latest = tasks[0];
+        actions.push({ type: 'mark_done', payload: { id: latest.id, slug: latest.slug, title: (latest.data && latest.data.title) || latest.slug } });
+      }
+    }
+    return actions;
+  }
+
   function agentComplete(prompt, state, skills) {
     const t0 = Date.now();
     const p = (prompt || '').toLowerCase();
@@ -1351,18 +1408,26 @@ let journals = [];
           const r = await window.__api.api.get('/api/skills?q=' + encodeURIComponent(text));
           matchedSkills = (r && r.skills) || [];
         } catch (e) { /* ignore */ }
-        const result = agentComplete(text, state, matchedSkills);
+        // v0.30 — try real LLM via /api/agent first. Falls back to in-browser
+        // local-echo on network/server error so the page keeps working.
+        const result = await callAgentWithFallback(text, state, matchedSkills);
         const msgEl = document.getElementById(thinkingId);
         if (msgEl) {
-          let bodyHtml = '<pre class="cockpit-agent-response-text">' + esc(result.text) + '</pre>';
+          let bodyHtml = '<pre class="cockpit-agent-response-text">' + esc(result.text || '') + '</pre>';
           if (result.actions && result.actions.length > 0) {
             const actionResults = await executeActions(result.actions, state);
             bodyHtml += renderActionsHtml(result.actions, actionResults);
           }
-          bodyHtml += '<div class="cockpit-agent-response-meta">' +
-            esc(result.provider) + ' · ' + esc(result.model) + ' · ' + result.durationMs + 'ms' +
-            (result.skillsLoaded ? ' · ' + result.skillsLoaded + ' skill(s) 注入' : '') +
-          '</div>';
+          let metaHtml = esc((result.provider && result.provider.name) || 'local-echo') +
+            ' · ' + esc((result.provider && result.provider.model) || 'unknown') +
+            ' · ' + (result.durationMs || 0) + 'ms' +
+            (result.skillsLoaded ? ' · ' + result.skillsLoaded + ' skill(s) 注入' : '');
+          if (result.apiError) {
+            metaHtml = '<span style="color:#ef4444;" title="' + esc(result.apiError) + '">⚠ API 调用失败</span> · ' + metaHtml;
+          } else if (result.source === 'server') {
+            metaHtml = '↗ real LLM · ' + metaHtml;
+          }
+          bodyHtml += '<div class="cockpit-agent-response-meta">' + metaHtml + '</div>';
           if (result.text && result.text.length > 30) {
             bodyHtml += '<div class="cockpit-agent-skill-save"><button class="btn btn-ghost btn-sm" data-save-skill-from-msg>↻ 存为 skill</button></div>';
           }

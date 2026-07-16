@@ -507,6 +507,13 @@
 
 
 
+
+## 2026-07-16 (v0.30 real LLM agent, ADR-0009)
+
+- **New endpoint `POST /api/agent`** (server-side) — calls the configured LLM with a compact system prompt (vault counts + 5 most-recent items + matched-skill names). Returns `{ text, provider, durationMs, error?, skillsLoaded }`. Privacy-respecting: no bulk vault export.
+- **Browser refactor**: cockpit agent now dispatches via `/api/agent`, falls back to in-browser `agentComplete` on error. New meta prefix "↗ real LLM" + ⚠ warning on API failure.
+- **New file**: `lib/agent.mjs` (162 lines) — `pickProvider` + `runAgent` + compact system-prompt builder.
+- **Bug fix follow-up**: v0.18 made weekly.mjs's `pickProvider` actually work; this v0.30 ships the server-side hook that v0.18's plumbing now feeds into.
 ## 2026-07-16 (v0.18 in-app LLM configuration, ADR-0008)
 
 - **Migrated LLM credentials from env to config.json**. Settings panel renders three new inputs (API Key, Base URL, Model). GET redacts the key as `••••••••<last4>` with a `configured` boolean. PUT handles mask-as-no-op vs explicit-clear vs real-key. POST `/api/llm/test` pings the provider.
