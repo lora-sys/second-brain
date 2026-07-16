@@ -181,6 +181,11 @@
     html = upgradeEmbeds(html, opts);
     // Smart mentions: auto-link known entity names that aren't already linked.
     html = applySmartMentions(html);
+    // v0.17: sanitize — strip script, javascript:, on* handlers, exotic tags.
+    // Trusted DOM-creating steps (applySmartMentions, upgradeEmbeds) survived.
+    if (window.sbSanitize && window.sbSanitize.html) {
+      html = window.sbSanitize.html(html);
+    }
     return html;
   }
 

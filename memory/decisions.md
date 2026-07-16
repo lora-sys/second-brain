@@ -503,6 +503,14 @@
 - **Bug fixed** — initial code had `const journals = []` but tried to reassign after the API call, causing silent failure. Fixed to `let`.
 - **205 commits on main** — pushed to origin.
 
+
+## 2026-07-15 (v0.17 sanitize markdown)
+
+- **Markdown output now flows through an allowlist sanitizer** (`public/lib/sanitize.js` + `lib/sanitize.mjs` mirror). 31 unit tests pass. E2E tests added to `real-device.mjs`.
+- **Tag allowlist**: ~40 safe markdown tags (h1-6, p, ul/ol/li, code/pre, blockquote, table*, a, img, iframe, etc.). Anything else is unwrapped.
+- **Attribute allowlist** per-tag + global `class`. `href`/`src` filtered for `javascript:`/`vbscript:`/`data:`. iframe `src` host must be in `EMBED_HOSTS = [www.youtube.com, youtube.com, youtu.be, player.vimeo.com, player.bilibili.com]`.
+- **Scope**: applies to `renderMarkdown` (entity detail pages) and `renderLatestReflection` (weekly insight widget). Skill viewer was already safe (`<pre>` + esc).
+- **No new deps.** jsdom was already in the budget.
 ## 2026-07-14 (v0.14 insight widget E2E)
 
 - **3 E2E tests added** for the 最新周报 dashboard widget:

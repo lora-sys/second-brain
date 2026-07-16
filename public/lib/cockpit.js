@@ -271,7 +271,11 @@ let journals = [];
     let rendered = '';
     try {
       if (window.marked) {
-        rendered = window.marked.parse(body);
+        let html = window.marked.parse(body);
+        // v0.17: sanitize markdown → allowlist of safe tags; strip scripts, javascript:, on* handlers
+        rendered = (window.sbSanitize && window.sbSanitize.html)
+          ? window.sbSanitize.html(html)
+          : html;
       } else {
         rendered = '<pre>' + esc(body) + '</pre>';
       }
