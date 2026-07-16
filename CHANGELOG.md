@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **v0.15 — Insight widget E2E closeout** — 5 new browser-level tests in `tests/e2e/real-device.mjs` covering: empty-state (mocked `/api/weekly` returning 0), heading/list paragraph structure preserved, the "看完整周报 →" link click actually navigates, and PNG screenshot capture. Closes the three gap items filed in v0.14's review-report.
 - **v0.16 — Recent Activity cockpit component** — extracted from cockpit.js into `public/lib/cockpit-activity.js`. Exposes `window.__cockpitActivity.{ renderRecentActivity, TYPE_LABELS, TYPE_DOTS }`. Adds `task.in_progress` to the type maps. 57 new unit tests via jsdom; 4 new e2e tests. cockpit.js: 2960 → 2884 lines. Rendered DOM byte-equivalent to the inline version.
 - **v0.17 — Markdown output sanitizer** — `marked.parse()` results now flow through an allowlist sanitizer before they hit the DOM. Two implementations stay in sync: `public/lib/sanitize.js` (browser, native DOMParser) and `lib/sanitize.mjs` (server, jsdom — already a dep). Strips `<script>`, `javascript:` URLs, `data:` URLs, `on*` event handlers, `style=` attributes, and exotic tags. Iframes must have `src` on `EMBED_HOSTS` (youtube.com, player.vimeo.com, player.bilibili.com) or the entire element is removed. New deps: none. Unit test count: 31 (`tests/sanitize.test.mjs`). Wired into `renderMarkdown` (entity detail pages) and `renderLatestReflection` (weekly insight widget). E2E coverage: 7 new tests in `real-device.mjs`.
 

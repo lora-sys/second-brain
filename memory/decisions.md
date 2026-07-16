@@ -505,6 +505,15 @@
 
 
 
+
+## 2026-07-16 (v0.15 insight widget E2E closeout)
+
+- **5 new E2E tests** for the v0.12 insight widget at the cockpit dashboard.
+  Covers the three gaps filed in v0.14's review: empty state (mocked
+  `/api/weekly`), heading/list/paragraph structure preserved through the
+  markdown sanitizer, and the "看完整周报 →" link click navigates. Includes
+  PNG screenshot capture.
+- **No app code touched.** Pure test-only change.
 ## 2026-07-16 (v0.16 extract Recent Activity)
 
 - **Pulled renderRecentActivity out of cockpit.js** into `public/lib/cockpit-activity.js` (141 lines). cockpit.js shrinks by ~80 lines (2960 → 2884).

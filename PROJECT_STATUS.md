@@ -102,6 +102,7 @@ _None._
 | `1a3cc0c` | chore(release): v0.5.0-alpha (event stream + daily memory) | [docs/evidence/v0.5.4-daily-timeline/](evidence/v0.5.4-daily-timeline/) |
 | `(pending)` | feat(security): v0.17 — sanitize markdown output (XSS hardening) | [docs/evidence/v0.17-sanitize-markdown/](evidence/v0.17-sanitize-markdown/) |
 | `(pending)` | refactor(cockpit): v0.16 — extract Recent Activity to standalone component | [docs/evidence/v0.16-activity-component/](evidence/v0.16-activity-component/) |
+| `(pending)` | test(e2e): v0.15 — insight widget E2E closeout (empty state, link click, deeper HTML) | [docs/evidence/v0.15-insight-e2e/](evidence/v0.15-insight-e2e/) |
 | `57c2ba6` | merge: feature/v0.5.4-daily-timeline (7-day daily timeline) | [docs/evidence/v0.5.4-daily-timeline/](evidence/v0.5.4-daily-timeline/) |
 | `8dbf510` | merge: feature/v0.5.1-fs-watcher (FS watcher for external vault changes) | [docs/evidence/v0.5.1-fs-watcher/](evidence/v0.5.1-fs-watcher/) |
 | `a250637` | merge: feature/v0.5-event-stream (event stream + daily journal) | [docs/evidence/v0.5-event-stream/](evidence/v0.5-event-stream/) |
