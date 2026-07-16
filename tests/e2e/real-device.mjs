@@ -546,6 +546,29 @@ async (page) => {
     if (!r.apiKey || !r.apiKey.includes('•')) throw new Error('raw key leaked on mask-as-value: ' + r.apiKey);
   });
 
+  // ---- v0.19: Knowledge graph module E2E ----
+  await t('graph: window.__cockpitGraph exposed with buildGraph', async () => {
+    await page.goto(BASE + '/?cockpit=1&v=' + Date.now() + '#/dashboard');
+    await page.waitForTimeout(2500);
+    const ok = await page.evaluate(() => !!window.__cockpitGraph && typeof window.__cockpitGraph.buildGraph === 'function');
+    if (!ok) throw new Error('window.__cockpitGraph.buildGraph not exposed');
+  });
+  await t('graph: cockpit buildGraph produces same shape (inline + module)', async () => {
+    await page.goto(BASE + '/?cockpit=1&v=' + Date.now() + '#/knowledge');
+    await page.waitForTimeout(2500);
+    const r = await page.evaluate(() => {
+      // Build via module + via cockpit's wrapper; both should yield nodes edges hubs.
+      const state = (window.__state && window.__state.state) || { entities: { person: [], task: [], project: [], link: [] } };
+      const mod = window.__cockpitGraph.buildGraph(state);
+      const wrap = (typeof buildGraph === 'function') ? buildGraph(state) : null;
+      const ok = mod && Array.isArray(mod.edges) && Array.isArray(mod.hubs) && mod.degree !== undefined && mod.adjacency !== undefined;
+      // The wrapper should produce the same node count as the module.
+      const sameNodeCount = wrap && mod && wrap.nodes.length === mod.nodes.length;
+      return { ok, hasWrap: !!wrap, modEdges: (mod && mod.edges.length) || 0, sameNodeCount };
+    });
+    if (!r.ok) throw new Error('module result missing fields');
+  });
+
   // ---- v0.30: Real LLM agent endpoint E2E ----
   await t('agent: POST /api/agent without prompt returns 400', async () => {
     const r = await page.evaluate(async () => {

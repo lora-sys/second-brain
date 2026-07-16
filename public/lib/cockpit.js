@@ -2642,78 +2642,16 @@ let journals = [];
   //   - One has a wikilink to the other ([[type/slug]] or [[slug]])
   //   - They share at least one tag
   // Returns {nodes, edges, hubs} where hubs = entities sorted by degree.
+  // -------------------- Knowledge graph helpers (v0.19) --------------------
+  // buildGraph moved to public/lib/cockpit-graph.js (window.__cockpitGraph.buildGraph).
+  // This thin wrapper keeps cockpit.js working whether the module is loaded or not,
+  // and lets us drop the inline ~80 lines while preserving the exact same return shape.
   function buildGraph(state) {
-    const e = state && state.entities;
-    if (!e) return { nodes: [], edges: [], hubs: [] };
-    const all = [];
-    for (const type of ['person', 'task', 'project', 'link']) {
-      for (const item of (e[type] || [])) {
-        all.push({ ...item, _type: type });
-      }
+    if (window.__cockpitGraph && typeof window.__cockpitGraph.buildGraph === 'function') {
+      return window.__cockpitGraph.buildGraph(state);
     }
-    if (all.length === 0) return { nodes: [], edges: [], hubs: [] };
-    // Map of id -> entity for wikilink resolution
-    const byId = {};
-    const bySlug = {};
-    for (const it of all) {
-      byId[it.id] = it;
-      bySlug[`${it._type}/${it.slug}`] = it;
-      bySlug[it.slug] = it; // fallback: bare slug
-    }
-    const titleOf = (it) => (it.data && (it.data.title || it.data.name)) || it.slug;
-    const edges = new Map(); // "from|to" -> {reason}
-    const addEdge = (from, to, reason) => {
-      if (!from || !to || from.id === to.id) return;
-      const key = [from.id, to.id].sort().join('|');
-      if (!edges.has(key)) edges.set(key, { from: from.id, to: to.id, reasons: new Set() });
-      edges.get(key).reasons.add(reason);
-    };
-    // Wikilink edges
-    const wikiRe = /\[\[([^\]]+)\]\]/g;
-    for (const it of all) {
-      const body = it.body || '';
-      let m;
-      while ((m = wikiRe.exec(body)) !== null) {
-        const target = m[1].trim();
-        const resolved = bySlug[target];
-        if (resolved) addEdge(it, resolved, 'wikilink');
-      }
-    }
-    // Tag-overlap edges
-    const tagToEntities = {};
-    for (const it of all) {
-      for (const tag of (it.data && it.data.tags) || []) {
-        if (!tagToEntities[tag]) tagToEntities[tag] = [];
-        tagToEntities[tag].push(it);
-      }
-    }
-    for (const tag of Object.keys(tagToEntities)) {
-      const bucket = tagToEntities[tag];
-      if (bucket.length < 2) continue;
-      for (let i = 0; i < bucket.length; i++) {
-        for (let j = i + 1; j < bucket.length; j++) {
-          addEdge(bucket[i], bucket[j], `#${tag}`);
-        }
-      }
-    }
-    // Compute degree
-    const degree = {};
-    for (const it of all) degree[it.id] = 0;
-    for (const e of edges.values()) {
-      degree[e.from] = (degree[e.from] || 0) + 1;
-      degree[e.to] = (degree[e.to] || 0) + 1;
-    }
-    const hubs = all
-      .filter(it => degree[it.id] > 0)
-      .sort((a, b) => degree[b.id] - degree[a.id]);
-    // Build adjacency: for each entity, list of connected entities with reason labels
-    const adjacency = {};
-    for (const it of all) adjacency[it.id] = [];
-    for (const e of edges.values()) {
-      adjacency[e.from].push({ other: e.to, reasons: Array.from(e.reasons) });
-      adjacency[e.to].push({ other: e.from, reasons: Array.from(e.reasons) });
-    }
-    return { nodes: all, edges: Array.from(edges.values()), hubs, degree, adjacency, titleOf, byId };
+    // Fallback if module didn't load (defensive — should never happen in production).
+    return { nodes: [], edges: [], hubs: [], degree: {}, adjacency: {} };
   }
 
   function renderKnowledge(state) {

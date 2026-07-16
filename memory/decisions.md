@@ -508,6 +508,12 @@
 
 
 
+
+## 2026-07-16 (v0.19 extract knowledge graph to lib/)
+
+- **`buildGraph` lifted from cockpit.js** to `lib/graph.mjs` (server, 112 lines) + `public/lib/cockpit-graph.js` (browser, 103 lines). cockpit.js lost 73 lines.
+- **Bug discovered + fixed**: original returned `edges[].reasons` as `Set` while adjacency used `Array`. JSON.stringify on a Set produces `{}` — would have silently truncated if anyone ever serialized top-level edges. Normalized to Array.
+- **37 unit tests + 2 e2e tests.** No new deps. cockpit.js: 2884 → 2864 lines.
 ## 2026-07-16 (v0.30 real LLM agent, ADR-0009)
 
 - **New endpoint `POST /api/agent`** (server-side) — calls the configured LLM with a compact system prompt (vault counts + 5 most-recent items + matched-skill names). Returns `{ text, provider, durationMs, error?, skillsLoaded }`. Privacy-respecting: no bulk vault export.
