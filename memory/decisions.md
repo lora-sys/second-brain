@@ -509,6 +509,13 @@
 
 
 
+
+## 2026-07-16 (v0.20 MCP resources + prompts, ADR-0006 continuation)
+
+- **5 vault:// resources**: entities, recent, tags, graph (uses lib/graph.mjs from v0.19), skills.
+- **4 prompts**: summarize-week, draft-decision, consolidate-tasks, reflect-on-day.
+- **Capabilities**: `{ tools, resources, prompts }`. Version 0.20.0.
+- **45 unit tests + end-to-end smoke** via JSON-RPC over stdio driver. No new npm deps.
 ## 2026-07-16 (v0.19 extract knowledge graph to lib/)
 
 - **`buildGraph` lifted from cockpit.js** to `lib/graph.mjs` (server, 112 lines) + `public/lib/cockpit-graph.js` (browser, 103 lines). cockpit.js lost 73 lines.
