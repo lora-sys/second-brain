@@ -105,6 +105,7 @@ _None._
 | `(pending)` | test(e2e): v0.15 — insight widget E2E closeout (empty state, link click, deeper HTML) | [docs/evidence/v0.15-insight-e2e/](evidence/v0.15-insight-e2e/) |
 | `(pending)` | feat(ux): v0.18 — in-app LLM configuration panel (ADR-0008) | [docs/evidence/v0.18-llm-config/](evidence/v0.18-llm-config/) |
 | `(pending)` | feat(agent): v0.30 — real LLM integration (ADR-0009) | [docs/evidence/v0.30-real-llm/](evidence/v0.30-real-llm/) |
+| `(pending)` | refactor(cockpit): v0.19 — extract knowledge graph to lib/ | [docs/evidence/v0.19-graph-module/](evidence/v0.19-graph-module/) |
 | `57c2ba6` | merge: feature/v0.5.4-daily-timeline (7-day daily timeline) | [docs/evidence/v0.5.4-daily-timeline/](evidence/v0.5.4-daily-timeline/) |
 | `8dbf510` | merge: feature/v0.5.1-fs-watcher (FS watcher for external vault changes) | [docs/evidence/v0.5.1-fs-watcher/](evidence/v0.5.1-fs-watcher/) |
 | `a250637` | merge: feature/v0.5-event-stream (event stream + daily journal) | [docs/evidence/v0.5-event-stream/](evidence/v0.5-event-stream/) |

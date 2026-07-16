@@ -11,7 +11,7 @@
     "dev:tauri": "cargo tauri dev",
     "build:tauri": "cargo tauri build",
     "tauri": "cargo tauri",
-    "check": "node --check server.mjs && node --check lib/*.mjs && node --check lib/llm/*.mjs && node tests/sanitize.test.mjs && node tests/cockpit-activity.test.mjs && node tests/llm-config.test.mjs && node tests/agent.test.mjs",
+    "check": "node --check server.mjs && node --check lib/*.mjs && node --check lib/llm/*.mjs && node tests/sanitize.test.mjs && node tests/cockpit-activity.test.mjs && node tests/llm-config.test.mjs && node tests/agent.test.mjs && node tests/graph.test.mjs",
     "check:tauri": "cd src-tauri && cargo check",
     "test:e2e": "playwright-cli run-code --filename recordings/e2e-demo.mjs",
     "test:e2e:cockpit": "node server.mjs & sleep 2 && playwright-cli open && playwright-cli run-code --filename tests/e2e/cockpit.mjs; kill %1 2>/dev/null"
